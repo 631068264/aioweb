@@ -10,7 +10,6 @@ import asyncio
 from aiohttp import web
 
 
-# TODO:对外接口
 async def index(request):
     body = b'Hello world'
     return web.Response(body='<h1>是打发斯蒂芬, %s!</h1>'.encode('utf-8'))

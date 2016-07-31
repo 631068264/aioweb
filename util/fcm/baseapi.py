@@ -122,7 +122,7 @@ class FCMAPI(object):
                         msg = self.parse_response(json_body, payload['registration_ids'])
                         if isinstance(msg, list):
                             result['status'] = resp_status
-                            result['message'] = ''
+                            result['message'] = FCM_STATUS_CODE[201]
                             result['invalid_regids'] = msg
                             return result
                     elif resp_status == 400:
@@ -160,12 +160,14 @@ class FCMAPI(object):
                         })
         if error:
             return error
-        return ''
+        return FCM_STATUS_CODE[200]
+
 
 if __name__ == "__main__":
     def get_regids_chunks(regid):
         for i in range(0, len(regid), 2):
             yield regid[i:i + 2]
+
 
     l = [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, ]
 

@@ -12,6 +12,6 @@ from aiomysql.sa import create_engine
 
 
 @asyncio.coroutine
-def get_conn():
-    engine = yield from create_engine(**config.DB_CONFIG)
+def get_connection():
+    engine = yield from create_engine(echo=True, **config.DB_CONFIG)
     return engine

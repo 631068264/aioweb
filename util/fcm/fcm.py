@@ -6,6 +6,8 @@
 @annotation = '' 
 """
 from config import FCM_CONFIG
+from db import get_connection
+from models import android_push
 from .baseapi import FCMAPI
 
 #
@@ -83,8 +85,28 @@ class FCMNotification(FCMAPI):
                                          restricted_package_name=restricted_package_name
                                          )
             payloads = [payload]
-
-        request_result = await self.send_request(payloads)
-
-        # TODO:错误数据库处理
+        try:
+            request_result = await self.send_request(payloads)
+            request_result = await parse_result(request_result)
+        except Exception as e:
+            print(e)
         return request_result
+
+
+async def parse_result(request_result):
+    if request_result.get('invalid_regids', None):
+        connection = await get_connection()
+        regids = request_result.get('invalid_regids')
+        regids = [regid['reg_id'] for regid in regids]
+        async with connection.acquire() as conn:
+            trans = await conn.begin()
+            try:
+                failed_items = await conn.execute(android_push.select(android_push.c.reg_id.in_(regids)))
+                fail_uids = [item.uid for item in failed_items]
+                request_result['fail_uids'] = fail_uids
+                await conn.execute(android_push.delete(android_push.c.reg_id.in_(regids)))
+            except Exception:
+                await trans.rollback()
+            await trans.commit()
+            return request_result
+    return request_result
