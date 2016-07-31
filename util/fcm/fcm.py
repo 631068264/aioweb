@@ -88,9 +88,13 @@ class FCMNotification(FCMAPI):
         try:
             request_result = await self.send_request(payloads)
             request_result = await parse_result(request_result)
+            return request_result
         except Exception as e:
             print(e)
-        return request_result
+        return {
+            "status": 500,
+            "message": FCM_CONFIG[500]
+        }
 
 
 async def parse_result(request_result):
@@ -109,4 +113,7 @@ async def parse_result(request_result):
                 await trans.rollback()
             await trans.commit()
             return request_result
+    else:
+        # TODO:log处理
+        pass
     return request_result
