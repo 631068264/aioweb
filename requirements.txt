@@ -1,0 +1,6 @@
+aiohttp==0.22.4
+aiomysql==0.0.7
+chardet==2.3.0
+multidict==1.2.1
+PyMySQL==0.6.7
+SQLAlchemy==1.0.14

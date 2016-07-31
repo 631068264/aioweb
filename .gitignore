@@ -1,0 +1,10 @@
+/.idea/
+/logs/
+/env/
+/env3/
+*.pyc
+
+migrations/
+.env/
+.DS_Store
+*.xml
