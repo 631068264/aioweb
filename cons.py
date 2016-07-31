@@ -12,3 +12,8 @@ FCM_STATUS_CODE = {
     400: 'JSON parsing error',
     500: 'FCM server is temporarily unavailable',
 }
+
+
+class STATUS(object):
+    SUCCESS = 1
+    FAIL = 0

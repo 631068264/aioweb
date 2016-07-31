@@ -5,4 +5,4 @@
 @time = 16/7/31 18:46
 @annotation = '' 
 """
-__all__ = ['test']
+__all__ = ['push']
