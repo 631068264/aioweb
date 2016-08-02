@@ -16,8 +16,8 @@ def OkResponse(data=None, message='', headers=None):
         'status': cons.STATUS.SUCCESS,
         'message': message,
     }
-
-    resp.update(data)
+    if data:
+        resp.update(data)
 
     return Response(text=json.dumps(resp), headers=headers,
                     content_type='application/json')
@@ -28,8 +28,8 @@ def ErrorResponse(data=None, message='', headers=None):
         'status': cons.STATUS.FAIL,
         'message': message,
     }
-
-    resp.update(data)
+    if data:
+        resp.update(data)
 
     return Response(text=json.dumps(resp), headers=headers,
                     content_type='application/json')

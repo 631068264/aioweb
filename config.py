@@ -6,11 +6,11 @@
 @annotation = '' 
 """
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": "3306",
-    "db": "android_push",
-    "user": "root",
-    "password": "",
+    'host': '127.0.0.1',
+    'port': 3306,
+    'db': 'android_push',
+    'user': 'root',
+    'password': '',
 }
 
 FCM_CONFIG = {
@@ -19,4 +19,6 @@ FCM_CONFIG = {
     "MAX_REGIDS": 1000,
     "LOW_PRIORITY": 'normal',
     "HIGH_PRIORITY": 'high',
+    "MAX_SIZE_BODY": 2048,
+    "TIME_TO_LIVE": (0, 2419200)
 }

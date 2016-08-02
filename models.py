@@ -12,7 +12,7 @@ metadata = sa.MetaData()
 android_push = sa.Table(
     'android_push',
     metadata,
-    sa.Column('uid', sa.Integer, primary_key=True),
+    sa.Column('uid', sa.INTEGER),
     sa.Column('reg_id', sa.CHAR(256)),
 )
 
