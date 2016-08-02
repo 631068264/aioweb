@@ -12,7 +12,7 @@ from models import android_push
 from util.fcm.fcm import FCMNotification
 from util.framework import ErrorResponse, OkResponse
 
-route = RouteCollector(prefix='android_push')
+route = RouteCollector(prefix='/android_push')
 push_service = FCMNotification()
 
 
@@ -27,7 +27,7 @@ async def token(request):
                                         'reg_id': resp['token'],
                                         })
             await conn.execute(stmt)
-        except Exception:
+        except Exception as e:
             await trans.rollback()
             return ErrorResponse()
         await trans.commit()
@@ -39,7 +39,6 @@ async def token(request):
 async def notify(request):
     resp = await request.json()
     uids = resp['uids']
-
     connection = await get_connection()
     async with connection.acquire() as conn:
         push_item = await conn.execute(android_push.select(android_push.c.uid.in_(uids)))
@@ -51,5 +50,7 @@ async def notify(request):
         'message_title': resp.get('message_title', None),
         'data_message': resp.get('data_message', None),
     }
-    result = await push_service.notify(**param)
-    return OkResponse(result)
+    is_ok, msg = await push_service.notify(**param)
+    if not is_ok:
+        return ErrorResponse(message=msg)
+    return OkResponse()
