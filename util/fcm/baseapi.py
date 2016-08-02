@@ -8,7 +8,7 @@ doc https://firebase.google.com/docs/cloud-messaging/http-server-ref
 """
 import json
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, errors
 from config import FCM_CONFIG
 from cons import FCM_STATUS_CODE
 
@@ -29,8 +29,7 @@ class FCMAPI(object):
         }
 
     def dump_json(self, data):
-        return (json.dumps(data, separators=(',', ':'), sort_keys=True)
-                .encode('utf8'))
+        return json.dumps(data, separators=(',', ':'), sort_keys=True)
 
     def get_regids_chunks(self, regids):
         for i in range(0, len(regids), self.MAX_REGIDS):
@@ -112,27 +111,33 @@ class FCMAPI(object):
         return self.dump_json(fcm_payload)
 
     async def send_request(self, payloads):
+        results = []
         for payload in payloads:
             result = {}
-            async with ClientSession() as session:
-                async with session.post(self.FCM_URL, data=payload, headers=self.request_headers()) as resp:
-                    resp_status = resp.status
-                    if resp_status == 200:
-                        json_body = await resp.json()
-                        msg = self.parse_response(json_body, payload['registration_ids'])
-                        if isinstance(msg, list):
-                            result['status'] = resp_status
-                            result['message'] = FCM_STATUS_CODE[201]
-                            result['invalid_regids'] = msg
-                            return result
-                    elif resp_status == 400:
-                        msg = await resp.text()
-                    else:
-                        msg = FCM_STATUS_CODE.get(resp_status, FCM_STATUS_CODE[500])
+            try:
+                async with ClientSession() as session:
+                    async with session.post(self.FCM_URL, data=payload, headers=self.request_headers()) as resp:
+                        resp_status = resp.status
+                        if resp_status == 200:
+                            json_body = await resp.json()
+                            msg = self.parse_response(json_body, json.loads(payload)['registration_ids'])
+                            if isinstance(msg, list):
+                                result['status'] = resp_status
+                                result['message'] = FCM_STATUS_CODE[201]
+                                result['invalid_regids'] = msg
+                                results.append(result)
+                                continue
+                        elif resp_status == 400:
+                            msg = await resp.text()
+                        else:
+                            msg = FCM_STATUS_CODE.get(resp_status, FCM_STATUS_CODE[500])
 
-                    result['status'] = resp_status
-                    result['message'] = msg
-                    return result
+                        result['status'] = resp_status
+                        result['message'] = msg
+                        results.append(result)
+            except errors.ClientOSError as e:
+                return False, e
+        return True, results
 
     def parse_response(self, response, regids):
         failure = response.get('failure', 0)
@@ -142,7 +147,7 @@ class FCMAPI(object):
             if len(results) == 1:
                 # 处理非regid错
                 msg = results[0].get('error', '')
-                if msg.lower().find("reg") >= 0:
+                if msg.lower().find('reg') >= 0:
                     error = {
                         'reg_id': regids[0],
                         'reason': msg,
@@ -152,8 +157,8 @@ class FCMAPI(object):
             else:
                 error = []
                 for index, result in enumerate(results):
-                    msg = results[0].get('error', '')
-                    if msg:
+                    msg = result.get('error', '')
+                    if msg and msg.lower().find('reg') >= 0:
                         error.append({
                             'reg_id': regids[index],
                             'reason': msg,
