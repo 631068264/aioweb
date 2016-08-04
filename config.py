@@ -14,11 +14,17 @@ DB_CONFIG = {
 }
 
 FCM_CONFIG = {
-    "URL": "https://fcm.googleapis.com/fcm/send",
-    "API_KEY": "AIzaSyAk7t-GDiMyUYGC_5oxwoAoVAjSzs_afqc",
-    "MAX_REGIDS": 1000,
-    "LOW_PRIORITY": 'normal',
-    "HIGH_PRIORITY": 'high',
-    "MAX_SIZE_BODY": 2048,
-    "TIME_TO_LIVE": (0, 2419200)
+    'URL': 'https://fcm.googleapis.com/fcm/send',
+    'API_KEY': 'AIzaSyAk7t-GDiMyUYGC_5oxwoAoVAjSzs_afqc',
+    'MAX_REGIDS': 1000,
+    'LOW_PRIORITY': 'normal',
+    'HIGH_PRIORITY': 'high',
+    'MAX_SIZE_BODY': 2048,
+    'TIME_TO_LIVE': (0, 2419200)
 }
+
+LOG_CONFIG = [
+    ['aiohttp.access', 'access.log', 'debug'],
+    ['aiohttp.server', 'web-error.log', 'debug'],
+    ['service-log', 'service.log', 'debug'],
+]
