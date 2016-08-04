@@ -5,12 +5,10 @@
 @time = 16/7/30 17:37
 @annotation = '' 
 """
+import asyncio
 from sys import getsizeof
 
 from config import FCM_CONFIG
-from cons import FCM_STATUS_CODE
-from db import get_connection
-from models import android_push
 from .baseapi import FCMAPI
 
 # 设置dry_run 调试模式
@@ -18,7 +16,11 @@ DEBUG = False
 
 
 class FCMNotification(FCMAPI):
+    def __init__(self, max_concurrent):
+        super(FCMNotification, self).__init__(max_concurrent)
+
     async def notify(self,
+                     task_id,
                      registration_ids=None,
                      message_body=None,
                      message_title=None,
@@ -40,6 +42,8 @@ class FCMNotification(FCMAPI):
                      title_loc_args=None,
                      restricted_package_name=None):
         # 数据校验
+        if not task_id:
+            return False, "task_id is null"
         if message_body:
             if isinstance(message_body, str) and getsizeof(message_body) > FCM_CONFIG['MAX_SIZE_BODY']:
                 return False, "MessageTooBig"
@@ -57,7 +61,8 @@ class FCMNotification(FCMAPI):
         if len(registration_ids) > FCM_CONFIG['MAX_REGIDS']:
             payloads = []
             for regids in self.get_regids_chunks(registration_ids):
-                payloads.append(self.parse_payload(registration_ids=regids,
+                payloads.append(self.parse_payload(task_id=task_id,
+                                                   registration_ids=regids,
                                                    message_body=message_body,
                                                    message_title=message_title,
                                                    data_message=data_message,
@@ -80,7 +85,8 @@ class FCMNotification(FCMAPI):
                                                    restricted_package_name=restricted_package_name
                                                    ))
         else:
-            payload = self.parse_payload(registration_ids=registration_ids,
+            payload = self.parse_payload(task_id=task_id,
+                                         registration_ids=registration_ids,
                                          message_body=message_body,
                                          message_title=message_title,
                                          data_message=data_message,
@@ -104,36 +110,21 @@ class FCMNotification(FCMAPI):
                                          )
             payloads = [payload]
 
-        # TODO:错误处理有点混乱
-        try:
-            is_ok, request_results = await self.send_request(payloads)
-            if not is_ok:
-                return False, request_results.strerror
-            is_ok, msg = await parse_result(request_results)
-            return is_ok, msg
-        except Exception as e:
-            return False, FCM_STATUS_CODE[500]
+        tasks = []
+        results = []
+        for payload in payloads:
+            req_future = asyncio.ensure_future(self.send_request(payload))
 
-
-async def parse_result(request_results):
-    for request_result in request_results:
-        if request_result.get('invalid_regids', None):
-            connection = await get_connection()
-            regids = request_result.pop('invalid_regids')
-            regids = [regid['reg_id'] for regid in regids]
-            async with connection.acquire() as conn:
-                trans = await conn.begin()
+            def push_response(fut):
                 try:
-                    stmt = android_push.select(android_push.c.reg_id.in_(regids)).group_by(android_push.c.uid)
-                    failed_items = await conn.execute(stmt)
-                    fail_uids = [item.uid for item in failed_items]
+                    res = fut.result()
+                    results.append(res)
+                except Exception as e:
+                    print(e)
+                    for f in tasks:
+                        f.cancel()
 
-                    request_result['fail_uids'] = fail_uids
-                    await conn.execute(android_push.delete(android_push.c.reg_id.in_(regids)))
-                except Exception:
-                    await trans.rollback()
-                await trans.commit()
-        else:
-            # TODO:log处理
-            pass
-    return True, ""
+            req_future.add_done_callback(push_response)
+            tasks.append(req_future)
+        await asyncio.wait(tasks)
+        return True, results

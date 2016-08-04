@@ -6,11 +6,16 @@
 doc https://firebase.google.com/docs/cloud-messaging/http-server-ref
  https://firebase.google.com/docs/cloud-messaging/concept-options
 """
+import asyncio
 import json
 
 from aiohttp import ClientSession, errors
 from config import FCM_CONFIG
 from cons import FCM_STATUS_CODE
+from db import get_connection
+from models import android_push
+from sqlalchemy import select
+from util import logger
 
 
 class FCMAPI(object):
@@ -21,6 +26,10 @@ class FCMAPI(object):
     MAX_REGIDS = FCM_CONFIG['MAX_REGIDS']
     LOW_PRIORITY = FCM_CONFIG['LOW_PRIORITY']
     HIGH_PRIORITY = FCM_CONFIG['HIGH_PRIORITY']
+
+    def __init__(self, max_concurrent=10):
+        self.sem = asyncio.Semaphore(value=max_concurrent)
+        self.log = logger.get("service-log")
 
     def request_headers(self):
         return {
@@ -36,6 +45,7 @@ class FCMAPI(object):
             yield regids[i:i + self.MAX_REGIDS]
 
     def parse_payload(self,
+                      task_id,
                       registration_ids=None,
                       message_body=None,
                       message_title=None,
@@ -59,6 +69,8 @@ class FCMAPI(object):
                       restricted_package_name=None):
 
         fcm_payload = {}
+        if task_id:
+            fcm_payload['task_id'] = task_id
         # 发送对象
         if registration_ids:
             fcm_payload['registration_ids'] = registration_ids
@@ -110,34 +122,45 @@ class FCMAPI(object):
 
         return self.dump_json(fcm_payload)
 
-    async def send_request(self, payloads):
-        results = []
-        for payload in payloads:
-            result = {}
-            try:
-                async with ClientSession() as session:
-                    async with session.post(self.FCM_URL, data=payload, headers=self.request_headers()) as resp:
-                        resp_status = resp.status
-                        if resp_status == 200:
-                            json_body = await resp.json()
-                            msg = self.parse_response(json_body, json.loads(payload)['registration_ids'])
-                            if isinstance(msg, list):
-                                result['status'] = resp_status
-                                result['message'] = FCM_STATUS_CODE[201]
-                                result['invalid_regids'] = msg
-                                results.append(result)
-                                continue
-                        elif resp_status == 400:
-                            msg = await resp.text()
-                        else:
-                            msg = FCM_STATUS_CODE.get(resp_status, FCM_STATUS_CODE[500])
+    async def send_request(self, payload):
+        await self.sem.acquire()
+        result = {}
+        dump = json.loads(payload)
+        task_id = dump['task_id']
+        registration_ids = dump['registration_ids']
+        try:
+            async with ClientSession() as session:
+                async with session.post(self.FCM_URL, data=payload, headers=self.request_headers()) as resp:
+                    resp_status = resp.status
+                    if resp_status == 200:
+                        json_body = await resp.json()
+                        msg = self.parse_response(json_body, registration_ids)
+                        # 处理失败reg_id
+                        if isinstance(msg, list):
+                            await self.handler_error_regids(msg)
+                    elif resp_status == 400:
+                        msg = await resp.text()
+                        self.log.error('FCM_Response [task_id=%s]:[ %d ]:%s' % (task_id, resp_status, msg))
+                    elif resp_status == 401:
+                        msg = FCM_STATUS_CODE[resp_status]
+                        self.log.error('AuthenticationError [task_id=%s]:%s' % (task_id, 'API_KEY_ERROR'))
+                    else:
+                        msg = await resp.text()
+                        self.log.error('FCM_Response [task_id=%s]:[ %d ]:%s' % (task_id, resp_status, msg))
+                        msg = FCM_STATUS_CODE.get(resp_status, FCM_STATUS_CODE[500])
 
-                        result['status'] = resp_status
-                        result['message'] = msg
-                        results.append(result)
-            except errors.ClientOSError as e:
-                return False, e
-        return True, results
+                    result['task_id'] = task_id
+                    result['status'] = resp_status
+                    result['message'] = FCM_STATUS_CODE[201] if isinstance(msg, list) else msg
+            return result
+        except errors.ClientOSError as e:
+            self.log.error('[asyncio.errores.ClientOSError] [ task_id=%s ]%s' % (task_id, e.strerror))
+            result['task_id'] = task_id
+            result['status'] = 500
+            result['message'] = e.strerror
+            return result
+        finally:
+            self.sem.release()
 
     def parse_response(self, response, regids):
         failure = response.get('failure', 0)
@@ -167,14 +190,13 @@ class FCMAPI(object):
             return error
         return FCM_STATUS_CODE[200]
 
-
-if __name__ == "__main__":
-    def get_regids_chunks(regid):
-        for i in range(0, len(regid), 2):
-            yield regid[i:i + 2]
-
-
-    l = [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, ]
-
-    for i in get_regids_chunks(l):
-        print(i)
+    async def handler_error_regids(self, regids):
+        regids = [reg_id['reg_id'] for reg_id in regids]
+        connection = await get_connection()
+        async with connection.acquire() as conn:
+            async with await conn.begin():
+                stmt = select([android_push.c.uid]).where(android_push.c.reg_id.in_(regids)
+                                                          ).group_by(android_push.c.uid)
+                fail_uids = await conn.execute(stmt)
+                fail_uisds = [uid.uid for uid in fail_uids]
+                await conn.execute(android_push.delete(android_push.c.reg_id.in_(regids)))
