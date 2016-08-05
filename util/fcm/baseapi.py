@@ -15,7 +15,6 @@ from cons import FCM_STATUS_CODE
 from db import get_connection
 from models import android_push
 from sqlalchemy import select
-from util import logger
 
 
 class FCMAPI(object):
@@ -27,9 +26,14 @@ class FCMAPI(object):
     LOW_PRIORITY = FCM_CONFIG['LOW_PRIORITY']
     HIGH_PRIORITY = FCM_CONFIG['HIGH_PRIORITY']
 
-    def __init__(self, max_concurrent=10):
+    def __init__(self, max_concurrent=10, fcm_logger=None):
         self.sem = asyncio.Semaphore(value=max_concurrent)
-        self.log = logger.get("service-log")
+        self.logger = fcm_logger
+
+    def log(self, msg):
+        if self.logger is None:
+            return
+        self.logger(msg)
 
     def request_headers(self):
         return {
@@ -140,13 +144,13 @@ class FCMAPI(object):
                             await self.handler_error_regids(msg)
                     elif resp_status == 400:
                         msg = await resp.text()
-                        self.log.error('FCM_Response [task_id=%s]:[ %d ]:%s' % (task_id, resp_status, msg))
+                        self.log('FCM_Response [task_id=%s]:[ %d ]:%s' % (task_id, resp_status, msg))
                     elif resp_status == 401:
                         msg = FCM_STATUS_CODE[resp_status]
-                        self.log.error('AuthenticationError [task_id=%s]:%s' % (task_id, 'API_KEY_ERROR'))
+                        self.log('AuthenticationError [task_id=%s]:%s' % (task_id, 'API_KEY_ERROR'))
                     else:
                         msg = await resp.text()
-                        self.log.error('FCM_Response [task_id=%s]:[ %d ]:%s' % (task_id, resp_status, msg))
+                        self.log('FCM_Response [task_id=%s]:[ %d ]:%s' % (task_id, resp_status, msg))
                         msg = FCM_STATUS_CODE.get(resp_status, FCM_STATUS_CODE[500])
 
                     result['task_id'] = task_id
@@ -154,7 +158,7 @@ class FCMAPI(object):
                     result['message'] = FCM_STATUS_CODE[201] if isinstance(msg, list) else msg
             return result
         except errors.ClientOSError as e:
-            self.log.error('[asyncio.errores.ClientOSError] [ task_id=%s ]%s' % (task_id, e.strerror))
+            self.log('[asyncio.errores.ClientOSError] [ task_id=%s ]%s' % (task_id, e.strerror))
             result['task_id'] = task_id
             result['status'] = 500
             result['message'] = e.strerror

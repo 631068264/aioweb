@@ -11,13 +11,14 @@ from sys import getsizeof
 from config import FCM_CONFIG
 from .baseapi import FCMAPI
 
-# 设置dry_run 调试模式
+# 设置dry_run 调试模式 只是发送到FCM服务器不会发送到设备
 DEBUG = False
+FCM_LOGGER = None
 
 
 class FCMNotification(FCMAPI):
     def __init__(self, max_concurrent):
-        super(FCMNotification, self).__init__(max_concurrent)
+        super(FCMNotification, self).__init__(max_concurrent, FCM_LOGGER)
 
     async def notify(self,
                      task_id,
