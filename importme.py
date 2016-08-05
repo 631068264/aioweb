@@ -16,7 +16,7 @@ sys.path.append(os.path.split(project_home)[0])
 sys.path.append(project_home)
 
 import config
-from util import logger
+from base import logger
 
 # log setting
 logger.init_log([(n, os.path.join("logs", p), l)

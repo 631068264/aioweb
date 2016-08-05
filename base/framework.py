@@ -7,8 +7,8 @@
 """
 import json
 
-import cons
 from aiohttp.web_reqrep import Response
+from base import cons
 
 
 def OkResponse(data=None, message='', headers=None):
