@@ -11,25 +11,25 @@ from aiohttp.web_reqrep import Response
 from base import cons
 
 
-def OkResponse(data=None, message='', headers=None):
-    resp = {
-        'status': cons.STATUS.SUCCESS,
-        'message': message,
-    }
-    if data:
-        resp.update(data)
+class OkResponse(Response):
+    def __init__(self, **kwargs):
+        Response.__init__(self)
+        resp = {
+            'status': cons.STATUS.SUCCESS,
+            'message': '',
+        }
+        resp.update(kwargs)
+        self.text = json.dumps(resp)
+        self.content_type = 'application/json'
 
-    return Response(text=json.dumps(resp), headers=headers,
-                    content_type='application/json')
 
-
-def ErrorResponse(data=None, message='', headers=None):
-    resp = {
-        'status': cons.STATUS.FAIL,
-        'message': message,
-    }
-    if data:
-        resp.update(data)
-
-    return Response(text=json.dumps(resp), headers=headers,
-                    content_type='application/json')
+class ErrorResponse(Response):
+    def __init__(self, **kwargs):
+        Response.__init__(self)
+        resp = {
+            'status': cons.STATUS.FAIL,
+            'message': '',
+        }
+        resp.update(kwargs)
+        self.text = json.dumps(resp)
+        self.content_type = 'application/json'

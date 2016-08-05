@@ -55,4 +55,4 @@ async def notify(request):
     is_ok, msg = await push_service.notify(**param)
     if not is_ok:
         return ErrorResponse(message=msg)
-    return OkResponse({"results": msg})
+    return OkResponse(results=msg)
