@@ -6,9 +6,8 @@
 @annotation = '' 
 """
 
-from aiohttp_route_decorator import RouteCollector
 from base.db import get_connection
-from base.framework import ErrorResponse, OkResponse
+from base.framework import ErrorResponse, OkResponse, RouteCollector
 from base.models import android_push
 from util.fcm.fcm import FCMNotification
 
