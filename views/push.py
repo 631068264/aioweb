@@ -23,7 +23,7 @@ push_service = FCMNotification(max_concurrent=10)
     'uid': (F_int('用户id') > 0) & 'required' & 'strict',
     'token': F_str('用户token') & 'required' & 'strict',
 })
-async def token(safe_vars):
+async def token(request, safe_vars):
     connection = await get_connection()
     async with connection.acquire() as conn:
         trans = await conn.begin()
@@ -53,7 +53,7 @@ async def token(safe_vars):
         1]) & 'optional' & 'strict',
 
 })
-async def notify(safe_vars):
+async def notify(request, safe_vars):
     connection = await get_connection()
     async with connection.acquire() as conn:
         push_item = await conn.execute(android_push.select(android_push.c.uid.in_(safe_vars.uids)))
