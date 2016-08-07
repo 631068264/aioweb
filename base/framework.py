@@ -5,13 +5,19 @@
 @time = 16/7/31 21:51
 @annotation = '' 
 """
-import json
+from json import JSONDecodeError
 
 from aiohttp.web_reqrep import Response
+from attrdict import AttrDict
 from base import cons
+from base.util import safe_json_dumps
+from base.xform import DataChecker, default_messages
 from functools import wraps
 
 
+############################################################
+# Route https://github.com/IlyaSemenov/aiohttp_route_decorator
+############################################################
 class Route:
     """
     Usage:
@@ -60,25 +66,89 @@ class RouteCollector(list):
             route.add_to_router(router, prefix=prefix + self.prefix)
 
 
-class OkResponse(Response):
+############################################################
+# Response
+############################################################
+class JsonResponse(Response):
     def __init__(self, **kwargs):
         Response.__init__(self)
+        self._json = {} if kwargs is None else kwargs
+        self.content_type = 'application/json'
+        self.text = safe_json_dumps(self._json)
+
+
+class OkResponse(JsonResponse):
+    def __init__(self, **kwargs):
         resp = {
             'status': cons.STATUS.SUCCESS,
             'message': '',
         }
         resp.update(kwargs)
-        self.text = json.dumps(resp)
-        self.content_type = 'application/json'
+        JsonResponse.__init__(self, **resp)
 
 
-class ErrorResponse(Response):
-    def __init__(self, **kwargs):
-        Response.__init__(self)
+class ErrorResponse(JsonResponse):
+    def __init__(self, message='', **kwargs):
+        if isinstance(message, (list, tuple)):
+            message = ", ".join(message)
         resp = {
             'status': cons.STATUS.FAIL,
-            'message': '',
+            'message': message,
         }
         resp.update(kwargs)
-        self.text = json.dumps(resp)
-        self.content_type = 'application/json'
+        JsonResponse.__init__(self, **resp)
+
+
+############################################################
+# Decorator
+############################################################
+def data_check(settings=None, var_name='safe_vars', error_handler=None, is_strict=True, error_var='form_vars'):
+    if error_handler is None:
+        error_handler = ErrorResponse
+
+    def new_deco(old_handler):
+        @wraps(old_handler)
+        async def new_handler(request, *args, **kwargs):
+            # Collect data
+            is_ok, req_data = await get_request_data(request)
+            if not is_ok:
+                return error_handler(req_data)
+            checker = DataChecker(req_data, settings)
+
+            if not checker.is_valid():
+                if is_strict:
+                    error_msg = [v for v in checker.err_msg.values() if v is not None]
+                    return error_handler(error_msg)
+                else:
+                    kwargs[error_var] = checker.err_msg
+                    return await old_handler(request, *args, **kwargs)
+            kwargs[var_name] = AttrDict(checker.valid_data)
+
+            resp = await old_handler(request, *args, **kwargs)
+
+            return resp
+
+        return new_handler
+
+    return new_deco
+
+
+async def get_request_data(request):
+    req_data = {}
+    if request.method == 'POST':
+        if request.content_type.startswith('application/json'):
+            try:
+                json_data = await request.json()
+                req_data.update(json_data)
+            except JSONDecodeError as e:
+                return False, default_messages['json']
+        else:
+            post_data = await request.post()
+            req_data.update(post_data)
+    elif request.method == 'GET':
+        get_data = request.GET
+        req_data.update(get_data)
+
+    url_data = request.match_info
+    req_data.update(url_data)
+    return True, req_data

@@ -6,9 +6,7 @@
 @annotation = '' 
 """
 import asyncio
-from sys import getsizeof
 
-from config import FCM_CONFIG
 from .baseapi import FCMAPI
 
 # 设置dry_run 调试模式 只是发送到FCM服务器不会发送到设备
@@ -42,22 +40,6 @@ class FCMNotification(FCMAPI):
                      title_loc_key=None,
                      title_loc_args=None,
                      restricted_package_name=None):
-        # 数据校验
-        if not task_id:
-            return False, "task_id is null"
-        if message_body:
-            if isinstance(message_body, str) and getsizeof(message_body) > FCM_CONFIG['MAX_SIZE_BODY']:
-                return False, "MessageTooBig"
-        if message_title:
-            if isinstance(message_title, str) and getsizeof(message_title) > FCM_CONFIG['MAX_SIZE_BODY']:
-                return False, "MessageTooBig"
-        if data_message:
-            if isinstance(data_message, dict) and getsizeof(data_message) > FCM_CONFIG['MAX_SIZE_BODY']:
-                return False, "MessageTooBig"
-        if time_to_live:
-            if isinstance(time_to_live, str) and FCM_CONFIG['TIME_TO_LIVE'][0] <= time_to_live <= \
-                    FCM_CONFIG['TIME_TO_LIVE'][1]:
-                return False, "InvalidTtl"
 
         payloads = []
         for regids in self.get_regids_chunks(registration_ids):
