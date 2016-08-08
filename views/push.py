@@ -8,17 +8,18 @@
 from sys import getsizeof
 
 from base.db import get_connection
-from base.framework import ErrorResponse, OkResponse, RouteCollector, data_check
+from base.framework import ErrorResponse, OkResponse, RouteCollector, data_check, general
 from base.models import android_push
 from base.xform import F_int, F_str
 from config import FCM_CONFIG
 from util.fcm.fcm import FCMNotification
 
-route = RouteCollector(prefix='/android_push')
+route = RouteCollector('push', prefix='/android_push')
 push_service = FCMNotification(max_concurrent=10)
 
 
 @route('/token', method='POST')
+@general()
 @data_check({
     'uid': (F_int('用户id') > 0) & 'required' & 'strict',
     'token': F_str('用户token') & 'required' & 'strict',
@@ -41,6 +42,7 @@ async def token(request, safe_vars):
 
 
 @route('/notify', method='POST')
+@general()
 @data_check({
     'uids': (F_int('用户id') > 0) & 'required' & 'strict' & 'multiple',
     'task_id': F_str('任务id') & 'required' & 'strict',

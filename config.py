@@ -22,9 +22,13 @@ FCM_CONFIG = {
     'MAX_SIZE_BODY': 2048,
     'TIME_TO_LIVE': (0, 2419200)
 }
+
 fcm_log = 'fcm-log'
 LOG_CONFIG = [
     ['aiohttp.access', 'access.log', 'debug'],
-    ['aiohttp.server', 'web-error.log', 'debug'],
+    # ['aiohttp.server', 'web-error.log', 'debug'],
     ['fcm-log', 'fcm-service.log', 'debug'],
 ]
+
+app_path = ''
+static_path = '/static'

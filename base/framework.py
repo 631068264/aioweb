@@ -7,16 +7,18 @@
 """
 from json import JSONDecodeError
 
-from aiohttp.web_reqrep import Response
+import aiohttp
+import config
+from aiohttp.web_reqrep import Response, json_response
+from aiohttp_jinja2 import render_template
 from attrdict import AttrDict
-from base import cons
-from base.util import safe_json_dumps
-from base.xform import DataChecker, default_messages
+from base import cons, util
+from base.xform import default_messages, DataChecker
 from functools import wraps
 
 
 ############################################################
-# Route https://github.com/IlyaSemenov/aiohttp_route_decorator
+# Route Inspired by the https://github.com/IlyaSemenov/aiohttp_route_decorator
 ############################################################
 class Route:
     """
@@ -31,6 +33,8 @@ class Route:
 
     app = Application()
     route.add_to_router(app.router)
+
+    In the template use "url('reverse_route_name')" to get the url
     """
 
     def __init__(self, path, handler, *, method='GET', methods=None, name=None, **kwargs):
@@ -40,7 +44,7 @@ class Route:
         self.name = name
         self.kwargs = kwargs
 
-    def add_to_router(self, router, prefix=''):
+    def add_router(self, router, prefix=''):
         resource = router.add_resource(prefix + self.path, name=self.name)
         for method in self.methods:
             resource.add_route(method, self.handler, **self.kwargs)
@@ -48,22 +52,35 @@ class Route:
 
 
 class RouteCollector(list):
-    def __init__(self, iterable=[], *, prefix='', routes=[]):
-        if iterable and routes:
-            raise ValueError("RouteCollector accepts either iterable or routes, but not both")
-        super().__init__(routes or iterable)
-        self.prefix = prefix
+    """
+    Usage :
+        RouteCollector should have a name
+    """
+
+    def __init__(self, name='', *, prefix='', routes=[]):
+        if not name:
+            raise ValueError("RouteCollector should have a name")
+        super().__init__(routes)
+        self._prefix_path = prefix
+        self._prefix_name = name
 
     def __call__(self, path, *, method='GET', methods=None, name=None, **kwargs):
+        self._method_name = name
+
         def wrapper(handler):
-            self.append(Route(path, handler, method=method, methods=methods, name=name, **kwargs))
+            if self._method_name:
+                reverse_route_name = '%s.%s' % (self._prefix_name, self._method_name)
+            else:
+                reverse_route_name = '%s.%s' % (self._prefix_name, handler.__name__)
+
+            self.append(Route(path, handler, method=method, methods=methods, name=reverse_route_name, **kwargs))
             return handler
 
         return wrapper
 
     def add_to_router(self, router, prefix=''):
         for route in self:
-            route.add_to_router(router, prefix=prefix + self.prefix)
+            route.add_router(router, prefix=prefix + self._prefix_path)
 
 
 ############################################################
@@ -73,8 +90,31 @@ class JsonResponse(Response):
     def __init__(self, **kwargs):
         Response.__init__(self)
         self._json = {} if kwargs is None else kwargs
-        self.content_type = 'application/json'
-        self.text = safe_json_dumps(self._json)
+        self._text = util.safe_json_dumps(self._json)
+
+    def output(self):
+        return json_response(text=self._text)
+
+
+class TemplateResponse(Response):
+    def __init__(self, template_name, **context):
+        Response.__init__(self)
+        self._template_name = template_name
+        self._context = context
+
+    def context_update(self, **kwargs):
+        self._context.update(kwargs)
+        self._request = self._context.pop('request')
+
+    def output(self):
+        return render_template(self._template_name, request=self._request,
+                               context=self._context)
+
+
+class Redirect(Response):
+    def __init__(self):
+        Response.__init__(self)
+        aiohttp.web.HTTPFound()
 
 
 class OkResponse(JsonResponse):
@@ -102,6 +142,27 @@ class ErrorResponse(JsonResponse):
 ############################################################
 # Decorator
 ############################################################
+def general(desc=None):
+    def new_deco(old_handler):
+        @wraps(old_handler)
+        async def new_handler(request, *args, **kwargs):
+            resp = await old_handler(request, *args, **kwargs)
+            if isinstance(resp, TemplateResponse):
+                # add specific context
+                resp.context_update(
+                    request=request,
+                    config=config,
+                    cons=cons,
+                    util=util,
+                )
+                return resp.output()
+            return resp
+
+        return new_handler
+
+    return new_deco
+
+
 def data_check(settings=None, var_name='safe_vars', error_handler=None, is_strict=True, error_var='form_vars'):
     if error_handler is None:
         error_handler = ErrorResponse
@@ -109,7 +170,7 @@ def data_check(settings=None, var_name='safe_vars', error_handler=None, is_stric
     def new_deco(old_handler):
         @wraps(old_handler)
         async def new_handler(request, *args, **kwargs):
-            # Collect data
+            # collect data
             is_ok, req_data = await get_request_data(request)
             if not is_ok:
                 return error_handler(req_data)
