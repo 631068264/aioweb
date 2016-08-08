@@ -6,7 +6,9 @@
 @annotation = '' 
 """
 
-from base.framework import general, TemplateResponse, RouteCollector
+from base.framework import general, TemplateResponse, RouteCollector, Redirect
+
+# from util import url_for
 
 route = RouteCollector('temp')
 
@@ -26,6 +28,5 @@ async def b(request):
 @route('/r')
 @general()
 async def r(request):
-    pass
-
-# return aiohttp.web.HTTPFound(url('temp.a'))
+    # path = request.app.router['temp.b'].url()
+    return Redirect('temp.b', a=3)

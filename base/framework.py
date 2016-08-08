@@ -112,9 +112,20 @@ class TemplateResponse(Response):
 
 
 class Redirect(Response):
-    def __init__(self):
+    def __init__(self, route_name, query=None, **kwargs):
         Response.__init__(self)
-        aiohttp.web.HTTPFound()
+        self._context = kwargs
+        self._route_name = route_name
+        self._query = query
+
+    def conext_update(self, **kwargs):
+        self._context.update(kwargs)
+        self._request = self._context.pop('request')
+
+    def output(self):
+        path = self._request.app.router[self._route_name].url(
+            parts=self._context, query=self._query)
+        return aiohttp.web.HTTPFound(path)
 
 
 class OkResponse(JsonResponse):
@@ -155,8 +166,11 @@ def general(desc=None):
                     cons=cons,
                     util=util,
                 )
-                return resp.output()
-            return resp
+            elif isinstance(resp, Redirect):
+                resp.conext_update(
+                    request=request,
+                )
+            return resp.output()
 
         return new_handler
 

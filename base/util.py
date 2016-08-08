@@ -48,9 +48,6 @@ def safe_json_dumps(obj, encoding=None, silent=True):
     return str
 
 
-# def url(__aiohttp_jinja2_route_name, **kwargs):
-#     return app.router[__aiohttp_jinja2_route_name].url(**kwargs)
-
 if __name__ == "__main__":
     # a = lambda v: (True, v)
     # print(a("fsd"))
