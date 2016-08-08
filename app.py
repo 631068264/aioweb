@@ -5,6 +5,7 @@
 @time = 16/7/29 12:08
 @annotation = '' 
 """
+import jinja_filter
 import os
 
 project_home = os.path.realpath(__file__)
@@ -39,7 +40,10 @@ app.make_handler(access_log='aiohttp.access')
 # app.make_handler(access_log='aiohttp.server')
 
 # template setting
-aiohttp_jinja2.setup(app=app, loader=FileSystemLoader(os.path.join(project_home, 'templates')))
+env = aiohttp_jinja2.setup(app=app, loader=FileSystemLoader(os.path.join(project_home, 'templates')))
 app.router.add_static(config.static_path, os.path.join(project_home, 'static'))
+for name, func in jinja_filter.mapping.items():
+    env.filters[name] = func
+
 # app run
 web.run_app(app, port=8080, shutdown_timeout=15)

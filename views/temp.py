@@ -5,6 +5,7 @@
 @time = 16/8/7 23:06
 @annotation = '' 
 """
+from datetime import datetime
 
 from base.framework import general, TemplateResponse, RouteCollector, Redirect
 
@@ -16,7 +17,7 @@ route = RouteCollector('temp')
 @route('/a')
 @general()
 async def a(request):
-    return TemplateResponse('a.html', a='hello_w阿斯顿发放orld')
+    return TemplateResponse('a.html', a='hello_w阿斯顿发放orld', time=datetime.now())
 
 
 @route('/b/{a}')
