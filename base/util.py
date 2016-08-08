@@ -9,8 +9,6 @@ import datetime
 import json
 from decimal import Decimal
 
-import os
-
 
 def safe_json_default(obj):
     if isinstance(obj, datetime.datetime):
@@ -46,16 +44,3 @@ def safe_json_dumps(obj, encoding=None, silent=True):
         raise
 
     return str
-
-
-if __name__ == "__main__":
-    # a = lambda v: (True, v)
-    # print(a("fsd"))
-    project_home = os.path.abspath(__file__)
-    print(project_home)
-    project_home = os.path.realpath(__file__)
-    print(project_home)
-    project_home = os.path.dirname(project_home)
-    print(project_home)
-    project_home = os.path.split(project_home)[0]
-    print(project_home)
