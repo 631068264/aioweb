@@ -26,7 +26,7 @@ FCM_CONFIG = {
 fcm_log = 'fcm-log'
 LOG_CONFIG = [
     ['aiohttp.access', 'access.log', 'debug'],
-    # ['aiohttp.server', 'web-error.log', 'debug'],
+    ['web-error', 'web-error.log', 'debug'],
     ['fcm-log', 'fcm-service.log', 'debug'],
 ]
 

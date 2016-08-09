@@ -5,7 +5,6 @@
 @time = 16/7/29 12:08
 @annotation = '' 
 """
-import jinja_filter
 import os
 
 project_home = os.path.realpath(__file__)
@@ -22,6 +21,8 @@ import aiohttp_jinja2
 import views
 from aiohttp import web
 from jinja2 import FileSystemLoader
+import jinja_filter
+from framework import error_middleware
 
 # log setting
 logger.init_log([(n, os.path.join("logs", p), l)
@@ -29,7 +30,7 @@ logger.init_log([(n, os.path.join("logs", p), l)
 if getattr(config, 'fcm_log', None) is not None:
     fcm.FCM_LOGGER = logger.get(config.fcm_log).error
 
-app = web.Application()
+app = web.Application(middlewares=[error_middleware, ])
 # import handler
 for name in views.__all__:
     module = __import__('views.%s' % name, fromlist=[name])

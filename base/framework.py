@@ -5,16 +5,19 @@
 @time = 16/7/31 21:51
 @annotation = '' 
 """
+from functools import wraps
 from json import JSONDecodeError
 
 import aiohttp
-import config
+from aiohttp.web_exceptions import HTTPException
 from aiohttp.web_reqrep import Response, json_response
 from aiohttp_jinja2 import render_template
 from attrdict import AttrDict
+
+import config
+import logger
 from base import cons, util
 from base.xform import default_messages, DataChecker
-from functools import wraps
 
 __all__ = [
     "RouteCollector",
@@ -161,6 +164,30 @@ class ErrorResponse(JsonResponse):
         }
         resp.update(kwargs)
         JsonResponse.__init__(self, **resp)
+
+
+############################################################
+# Middleware
+############################################################
+async def error_middleware(app, handler):
+    async def middleware_handler(request):
+        try:
+            return await handler(request)
+        except HTTPException as e:
+            if e.status == 404:
+                return ErrorResponse('Not Found').output()
+            elif e.status == 500:
+                import traceback
+                err_msg = traceback.format_exc()
+                logger.get('web-error').error(err_msg)
+                return ErrorResponse(err_msg).output()
+        except Exception:
+            import traceback
+            err_msg = traceback.format_exc()
+            logger.get('web-error').error(err_msg)
+            return ErrorResponse('System Crash').output()
+
+    return middleware_handler
 
 
 ############################################################
