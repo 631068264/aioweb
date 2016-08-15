@@ -5,19 +5,18 @@
 @time = 16/7/31 21:51
 @annotation = '' 
 """
-from functools import wraps
 from json import JSONDecodeError
 
 import aiohttp
+import config
+import logger
 from aiohttp.web_exceptions import HTTPException
 from aiohttp.web_reqrep import Response, json_response
 from aiohttp_jinja2 import render_template
 from attrdict import AttrDict
-
-import config
-import logger
 from base import cons, util
 from base.xform import default_messages, DataChecker
+from functools import wraps
 
 __all__ = [
     "RouteCollector",
@@ -75,7 +74,7 @@ class RouteCollector(list):
 
     def __init__(self, name='', *, prefix='', routes=[]):
         if not name:
-            raise ValueError("RouteCollector should have a name")
+            raise Exception("RouteCollector should have a name")
         super().__init__(routes)
         self._prefix_path = prefix
         self._prefix_name = name
@@ -184,6 +183,7 @@ async def error_middleware(app, handler):
         except Exception:
             import traceback
             err_msg = traceback.format_exc()
+            print(err_msg)
             logger.get('web-error').error(err_msg)
             return ErrorResponse('System Crash').output()
 

@@ -11,9 +11,9 @@ import json
 
 from aiohttp import ClientSession, errors
 from base.cons import FCM_STATUS_CODE
-from base.db import get_connection
 from base.models import android_push
 from config import FCM_CONFIG
+from db.conn import get_connection
 from sqlalchemy import select
 
 

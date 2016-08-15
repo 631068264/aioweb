@@ -7,11 +7,11 @@
 """
 from sys import getsizeof
 
-from base.db import get_connection
 from base.framework import ErrorResponse, OkResponse, RouteCollector, data_check, general
 from base.models import android_push
 from base.xform import F_int, F_str
 from config import FCM_CONFIG
+from db.conn import get_connection
 from util.fcm.fcm import FCMNotification
 
 route = RouteCollector('push', prefix='/android_push')

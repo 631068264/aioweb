@@ -1,5 +1,5 @@
 ## **Basic aiohttp + aiomysql + aiohttp-jinja2 project**
-**FCM(Firebase Cloud Message)** 一个简单消息协程推送接口
+**这个主要是 FCM(Firebase Cloud Message)** 一个简单消息协程推送接口
 
 
 用着不爽,写些东西方便自己。向**Flask**用法靠拢 **有时间读读Flask源码**
