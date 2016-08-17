@@ -13,7 +13,7 @@ from base.models import android_push
 from base.xform import F_int, F_str
 from config import FCM_CONFIG
 from db.conn import get_connection, get_pool
-from db.smartconnect import transaction
+from db.smartconnect import transaction, getconn
 from util.fcm.fcm import FCMNotification
 
 route = RouteCollector('push', prefix='/android_push')
@@ -27,7 +27,7 @@ push_service = FCMNotification(max_concurrent=10)
     'token': F_str('用户token') & 'required' & 'strict',
 })
 async def token(request, safe_vars):
-    pool = await get_pool()
+    pool = await getconn("db_writer")
     with await pool as conn:
         async with transaction(conn) as conn:
             cur = await conn.cursor(DictCursor)

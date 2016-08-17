@@ -6,7 +6,6 @@
 @annotation = '' 
 """
 import os
-from db import smartconnect
 
 project_home = os.path.realpath(__file__)
 project_home = os.path.dirname(project_home)
@@ -23,6 +22,7 @@ import views
 from aiohttp import web
 from jinja2 import FileSystemLoader
 import jinja_filter
+from db import smartconnect
 from framework import error_middleware
 
 # log setting
@@ -31,9 +31,11 @@ logger.init_log([(n, os.path.join("logs", p), l)
 if getattr(config, 'fcm_log', None) is not None:
     fcm.FCM_LOGGER = logger.get(config.fcm_log).error
 
-# TODO:数据库初始化
 if getattr(config, 'query_log', None) is not None:
     smartconnect.query_log = logger.get(config.query_log).info
+
+for name, setting in config.db_config.items():
+    smartconnect.init_pool(name, *config.pool_size, **setting)
 
 app = web.Application(middlewares=[error_middleware, ])
 # import handler
