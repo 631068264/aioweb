@@ -6,6 +6,7 @@
 @annotation = '' 
 """
 import os
+from db import smartconnect
 
 project_home = os.path.realpath(__file__)
 project_home = os.path.dirname(project_home)
@@ -30,6 +31,10 @@ logger.init_log([(n, os.path.join("logs", p), l)
 if getattr(config, 'fcm_log', None) is not None:
     fcm.FCM_LOGGER = logger.get(config.fcm_log).error
 
+# TODO:数据库初始化
+if getattr(config, 'query_log', None) is not None:
+    smartconnect.query_log = logger.get(config.query_log).info
+
 app = web.Application(middlewares=[error_middleware, ])
 # import handler
 for name in views.__all__:
@@ -38,7 +43,6 @@ for name in views.__all__:
 
 # app-log setting
 app.make_handler(access_log='aiohttp.access')
-# app.make_handler(access_log='aiohttp.server')
 
 # template setting
 env = aiohttp_jinja2.setup(app=app, loader=FileSystemLoader(os.path.join(project_home, 'templates')))

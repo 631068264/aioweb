@@ -24,10 +24,12 @@ FCM_CONFIG = {
 }
 
 fcm_log = 'fcm-log'
+query_log = 'query-log'
 LOG_CONFIG = [
     ['aiohttp.access', 'access.log', 'debug'],
     ['web-error', 'web-error.log', 'debug'],
-    ['fcm-log', 'fcm-service.log', 'debug'],
+    [fcm_log, 'fcm-service.log', 'debug'],
+    [query_log, 'query.log', 'debug'],
 ]
 
 app_path = ''

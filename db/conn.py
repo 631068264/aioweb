@@ -7,6 +7,7 @@
 """
 import asyncio
 
+from aiomysql import create_pool
 import config
 from aiomysql.sa import create_engine
 
@@ -15,3 +16,9 @@ from aiomysql.sa import create_engine
 def get_connection():
     engine = yield from create_engine(echo=True, **config.DB_CONFIG)
     return engine
+
+
+@asyncio.coroutine
+def get_pool():
+    pool = yield from create_pool(**config.DB_CONFIG)
+    return pool
