@@ -32,6 +32,7 @@ FCM_CONFIG = {
 
 fcm_log = 'fcm-log'
 query_log = 'query-log'
+query_echo = True
 LOG_CONFIG = [
     ['aiohttp.access', 'access.log', 'debug'],
     ['web-error', 'web-error.log', 'debug'],

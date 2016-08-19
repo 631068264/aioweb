@@ -15,12 +15,12 @@ __all__ = [
     "MyConnection", "init_pool", "get_conn"
 ]
 query_log = None
-echo = False  # help you watch the log in console when you debug
+query_echo = False  # help you watch the log in console when you debug
 pools = {}
 
 
 def log(msg):
-    if echo:
+    if query_echo:
         print(msg)
     if query_log is None:
         return
@@ -63,7 +63,6 @@ class db_op(object):
             return cursor.lastrowid
         finally:
             await cursor.close()
-            return cursor.lastrowid
 
     @staticmethod
     async def execute(conn, sql, params=None):
@@ -113,17 +112,18 @@ class lock_str(object):
 
     async def lock(self):
         # TODO:[0][0]
-        locked = await db_op.select(self._conn, "SELECT GET_LOCK(%s, %s)", (self._key, self._timeout))[0][0] == 1
-        if locked:
+        locked = await db_op.select(self._conn, "SELECT GET_LOCK(%s, %s)", (self._key, self._timeout))
+
+        if locked[0][0] == 1:
             self._locks.append(self._key)
 
         return locked
 
     async def release(self):
 
-        released = await db_op.select(self._conn, "SELECT RELEASE_LOCK(%s)", (self._key,))[0][0] == 1
+        released = await db_op.select(self._conn, "SELECT RELEASE_LOCK(%s)", (self._key,))
 
-        if released and self._key in self._locks:
+        if released[0][0] == 1 and self._key in self._locks:
             self._locks.remove(self._key)
 
         return released

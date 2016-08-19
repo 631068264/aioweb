@@ -11,10 +11,10 @@ import json
 
 from aiohttp import ClientSession, errors
 from base.cons import FCM_STATUS_CODE
-from base.models import android_push
 from config import FCM_CONFIG
-from db.conn import get_connection
-from sqlalchemy import select
+from db.smartconnect import transaction
+from db.smartsql import QS, T, F
+from framework import db_conn
 
 
 class FCMAPI(object):
@@ -194,13 +194,12 @@ class FCMAPI(object):
             return error
         return FCM_STATUS_CODE[200]
 
-    async def handler_error_regids(self, regids):
+    @db_conn("db_writer")
+    async def handler_error_regids(self, regids, db):
         regids = [reg_id['reg_id'] for reg_id in regids]
-        connection = await get_connection()
-        async with connection.acquire() as conn:
-            async with await conn.begin():
-                stmt = select([android_push.c.uid]).where(android_push.c.reg_id.in_(regids)
-                                                          ).group_by(android_push.c.uid)
-                fail_uids = await conn.execute(stmt)
+
+        with await db as conn:
+            async with transaction(conn) as conn:
+                fail_uids = await QS(conn).table(T.android_push).where(F.reg_id == regids).group_by(F.uid).select(F.uid)
                 fail_uisds = [uid.uid for uid in fail_uids]
-                await conn.execute(android_push.delete(android_push.c.reg_id.in_(regids)))
+                await QS(conn).table(T.android_push).where(F.reg_id == regids).delete()

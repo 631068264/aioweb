@@ -33,6 +33,8 @@ if getattr(config, 'fcm_log', None) is not None:
 
 if getattr(config, 'query_log', None) is not None:
     smartconnect.query_log = logger.get(config.query_log).info
+if getattr(config, 'query_echo', None) is not None:
+    smartconnect.query_echo = config.query_echo
 
 for name, setting in config.db_config.items():
     smartconnect.init_pool(name, *config.pool_size, **setting)

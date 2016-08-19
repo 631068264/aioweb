@@ -205,7 +205,7 @@ def general(desc=None):
     def new_deco(old_handler):
         @wraps(old_handler)
         async def new_handler(request, *args, **kwargs):
-            print("%s - - %s %s" % (request.host, request.method, request.path_qs,))
+            print("%s - - %s %s" % (request.transport.get_extra_info('peername')[0], request.method, request.path_qs,))
             resp = await old_handler(request, *args, **kwargs)
             if isinstance(resp, TemplateResponse):
                 # add specific context

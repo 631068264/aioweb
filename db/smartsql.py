@@ -403,9 +403,10 @@ def _gen_f_list(f_list, default=None):
 
 
 def _format_field(field):
+    # F.table_alias__column_name
     if isinstance(field, Field):
         return field.sql
-
+    # "table_alias.column_name"
     parts = field.split(".")
 
     skip_list = [",", " ", "(", ")"]
@@ -543,6 +544,27 @@ class QuerySet(object):
         self._havings = c
         return self
 
+    # @opt_checker(["dict_cursor"])
+    # def select_by_string(self, c, **opt):
+    #     sql = c
+    #     params = []
+    #     if self._db is None:
+    #         return sql, params
+    #
+    #     attr_rows = []
+    #     rows = self._db.select(sql, params, dict_cursor=opt.get("dict_cursor", True))
+    #     for row in rows:
+    #         attr_rows.append(AttrDict(row))
+    #     return attr_rows
+    #
+    # def execute_by_string(self, c):
+    #     sql = c
+    #     params = []
+    #
+    #     if self._db is None:
+    #         return sql, params
+    #     return self._db.execute(sql, params)
+
     @opt_checker(["desc"])
     def order_by(self, *f_list, **opt):
         direct = "DESC" if opt.get("desc") else "ASC"
@@ -560,7 +582,7 @@ class QuerySet(object):
         return self
 
     @opt_checker(["distinct", "for_update"])
-    def count(self, *f_list, **opt):
+    async def count(self, *f_list, **opt):
         sql = ["SELECT"]
         params = []
 
@@ -580,8 +602,8 @@ class QuerySet(object):
         sql = " ".join(sql)
         if self._db is None:
             return sql, params
-
-        return self._db.select(sql, params)[0][0]
+        result = await db_op.select(self._db, sql, params)
+        return result[0][0]
 
     @opt_checker(["distinct", "for_update", "dict_cursor"])
     async def select(self, *f_list, **opt):
@@ -603,13 +625,12 @@ class QuerySet(object):
 
         attr_rows = []
         rows = await db_op.select(self._db, sql, params, dict_cursor=opt.get("dict_cursor", True))
-        # rows = self._db.select(sql, params, dict_cursor=opt.get("dict_cursor", True))
         for row in rows:
             attr_rows.append(AttrDict(row))
         return attr_rows
 
     @opt_checker(["distinct", "for_update"])
-    def select_one(self, *f_list, **opt):
+    async def select_one(self, *f_list, **opt):
         sql = ["SELECT"]
         params = []
 
@@ -626,24 +647,24 @@ class QuerySet(object):
         sql = " ".join(sql)
         if self._db is None:
             return sql, params
-
-        result = self._db.select(sql, params, dict_cursor=True)
+        result = await db_op.select(self._db, sql, params, dict_cursor=True)
         return None if len(result) < 1 else AttrDict(result[0])
 
-    def select_for_union(self, *f_list, **opt):
-        return UnionPart(*self.select(*f_list, **opt))
+    async def select_for_union(self, *f_list, **opt):
+        result = await self.select(*f_list, **opt)
+        return UnionPart(*result)
 
-    def insert(self, fv_dict, **opt):
-        sql, params = self.insert_many(
+    async def insert(self, fv_dict, **opt):
+        sql, params = await self.insert_many(
             list(fv_dict.keys()), ([fv_dict[k] for k in list(fv_dict.keys())],), __dry_run__=True, **opt)
 
         if self._db is None:
             return sql, params
 
-        return self._db.insert(sql, params)
+        return await db_op.insert(self._db, sql, params)
 
     @opt_checker(["ignore", "on_duplicate_key_update", "__dry_run__"])
-    def insert_many(self, f_list, v_list_set, **opt):
+    async def insert_many(self, f_list, v_list_set, **opt):
         sql = ["INSERT"]
         params = []
 
@@ -663,10 +684,10 @@ class QuerySet(object):
         if self._db is None or opt.get("__dry_run__", False):
             return sql, params
 
-        return self._db.execute(sql, params)
+        return await db_op.execute(self._db, sql, params)
 
     @opt_checker(["ignore"])
-    def update(self, fv_dict, **opt):
+    async def update(self, fv_dict, **opt):
         sql = ["UPDATE"]
         params = []
 
@@ -684,9 +705,9 @@ class QuerySet(object):
         if self._db is None:
             return sql, params
 
-        return self._db.execute(sql, params)
+        return await db_op.execute(self._db, sql, params)
 
-    def delete(self):
+    async def delete(self):
         sql = ["DELETE"]
         params = []
 
@@ -696,7 +717,7 @@ class QuerySet(object):
         if self._db is None:
             return sql, params
 
-        return self._db.execute(sql, params)
+        return await db_op.execute(self._db, sql, params)
 
     # private function
     def _join_sql_part(self, sql, params, join_list):
@@ -759,27 +780,6 @@ class UnionQuerySet(object):
 
         self._union_part_list.append(("UNION ALL", up))
         return self
-
-    @opt_checker(["dict_cursor"])
-    def select_by_string(self, c, **opt):
-        sql = c
-        params = []
-        if self._db is None:
-            return sql, params
-
-        attr_rows = []
-        rows = self._db.select(sql, params, dict_cursor=opt.get("dict_cursor", True))
-        for row in rows:
-            attr_rows.append(AttrDict(row))
-        return attr_rows
-
-    def execute_by_string(self, c):
-        sql = c
-        params = []
-
-        if self._db is None:
-            return sql, params
-        return self._db.execute(sql, params)
 
     @opt_checker(["desc"])
     def order_by(self, *f_list, **opt):

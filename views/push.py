@@ -8,10 +8,8 @@
 from sys import getsizeof
 
 from base.framework import ErrorResponse, OkResponse, RouteCollector, data_check, general, db_conn
-from base.models import android_push
 from base.xform import F_int, F_str
 from config import FCM_CONFIG
-from db.conn import get_connection
 from db.smartconnect import transaction
 from db.smartsql import QS, T, F
 from util.fcm.fcm import FCMNotification
@@ -30,46 +28,17 @@ push_service = FCMNotification(max_concurrent=10)
 async def token(request, safe_vars, db):
     with await db as conn:
         async with transaction(conn) as conn:
-            re = await QS(conn).table(T.android_push__a).where(F.a__uid == 1).select()
-            # cur = await conn.cursor(DictCursor)
-            # stmt = "select * from android_push"
-            # await cur.execute(stmt)
-            # re = await cur.fetchall()
-
-    print(re)
-    # pool = await get_pool()
-    # with await pool as conn:
-    #     cur = await conn.cursor(DictCursor)
-    #     stmt = "select * from android_push"
-    #     stmt = "delete from android_push WHERE uid = 1"
-    #     stmt = "INSERT INTO android_push(uid , reg_id) VALUES( 1 , ' dbWSi489gYQ : APA91bHYqPPaBYmWAsWE_VkIG9ZawZyLoYk - ZZ6l5upw9ICc6XUgkYl0lHx2BkwSvpvhy_3PjiK3weBx2FtO4ROMQnqk5EyTe5okf26GAbN5VrpH34iMsy7WtmGaZ2uNequxWKb85665 ')"
-    #     await cur.execute("begin")
-    #     f = await cur.execute(stmt)
-    #     print(cur.lastrowid)
-    #     await cur.execute("commit")
-    #     print(cur.lastrowid)
-    #     re = await cur.fetchall()
-    # print(cur.lastrowid)
-    # print(re)
-
-    # connection = await get_connection()
-    # async with connection.acquire() as conn:
-    #     trans = await conn.begin()
-    #     try:
-    #         stmt = android_push.insert({'uid': safe_vars.uid,
-    #                                     'reg_id': safe_vars.token,
-    #                                     })
-    #         await conn.execute(stmt)
-    #     except Exception as e:
-    #         await trans.rollback()
-    #         return ErrorResponse()
-    #     await trans.commit()
+            await QS(conn).table(T.android_push).insert({
+                "uid": safe_vars.uid,
+                "reg_id": safe_vars.token,
+            })
 
     return OkResponse()
 
 
 @route('/notify', method='POST')
 @general()
+@db_conn("db_writer")
 @data_check({
     'uids': (F_int('用户id') > 0) & 'required' & 'strict' & 'multiple',
     'task_id': F_str('任务id') & 'required' & 'strict',
@@ -82,10 +51,9 @@ async def token(request, safe_vars, db):
         1]) & 'optional' & 'strict',
 
 })
-async def notify(request, safe_vars):
-    connection = await get_connection()
-    async with connection.acquire() as conn:
-        push_item = await conn.execute(android_push.select(android_push.c.uid.in_(safe_vars.uids)))
+async def notify(request, safe_vars, db):
+    with await db as conn:
+        push_item = await QS(conn).table(T.android_push).where(F.uid == safe_vars.uids).select()
         registration_ids = [p.reg_id for p in push_item]
 
     safe_vars.registration_ids = registration_ids
