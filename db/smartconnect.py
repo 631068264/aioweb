@@ -8,24 +8,141 @@
 import asyncio
 
 import aiomysql
+from aiomysql import DictCursor
 
+__all__ = [
+    "db_op", "transaction", "lock_str",
+    "MyConnection", "init_pool", "get_conn"
+]
 query_log = None
-echo = False
+echo = False  # help you watch the log in console when you debug
 pools = {}
 
 
 def log(msg):
+    if echo:
+        print(msg)
     if query_log is None:
         return
     query_log(msg)
 
 
-class transaction(object):
-    def __init__(self, connection, loop=None):
+class db_op(object):
+    """
+    base db option
+    """
+
+    @staticmethod
+    async def select(conn, sql, params=None, dict_cursor=False):
+        log("execute: %s - %r" % (sql, params))
+
+        if dict_cursor:
+            cursor = await conn.cursor(DictCursor)
+        else:
+            cursor = await conn.cursor()
+        try:
+            if params:
+                await cursor.execute(sql, params)
+            else:
+                await cursor.execute(sql)
+
+            return await cursor.fetchall()
+        finally:
+            await cursor.close()
+
+    @staticmethod
+    async def insert(conn, sql, params=None):
+        log("execute: %s - %r" % (sql, params))
+
+        cursor = await conn.cursor()
+        try:
+            if params:
+                await  cursor.execute(sql, params)
+            else:
+                await cursor.execute(sql)
+            return cursor.lastrowid
+        finally:
+            await cursor.close()
+            return cursor.lastrowid
+
+    @staticmethod
+    async def execute(conn, sql, params=None):
+        log("execute: %s - %r" % (sql, params))
+
+        cursor = await conn.cursor()
+        try:
+            if params:
+                await  cursor.execute(sql, params)
+            else:
+                await cursor.execute(sql)
+        finally:
+            await cursor.close()
+
+
+class lock_str(object):
+    """
+    Usage:
+    It will release the lock finally
+    >>>async with lock_str(conn,"lock",timeout) as locked:
+    >>>      if not locked:
+    >>>         # locked failed do sth
+    >>>      do sth
+    """
+
+    def __init__(self, connection, key, timeout=0):
         self._conn = connection
-        self._loop = loop if loop else asyncio.get_event_loop()
+        self._key = key
+        self._timeout = timeout
+        self._locks = []
+
+    def __enter__(self):
+        raise RuntimeError(
+            'use "async with str_lock(conn,key, timeout) as locked" should be used as context manager expression')
+
+    def __exit__(self, *args):
+        pass
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        locked = yield from self.lock()
+        return locked
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        yield from self.release()
+
+    async def lock(self):
+        # TODO:[0][0]
+        locked = await db_op.select(self._conn, "SELECT GET_LOCK(%s, %s)", (self._key, self._timeout))[0][0] == 1
+        if locked:
+            self._locks.append(self._key)
+
+        return locked
+
+    async def release(self):
+
+        released = await db_op.select(self._conn, "SELECT RELEASE_LOCK(%s)", (self._key,))[0][0] == 1
+
+        if released and self._key in self._locks:
+            self._locks.remove(self._key)
+
+        return released
+
+
+class transaction(object):
+    """
+    Usage:
+        if "sth" makes any exception occurs, it will roolback
+         nothing wrong , it will commit
+     >>>async with transaction(conn) as conn:
+     >>>    do sth
+     >>>
+
+    """
+
+    def __init__(self, connection):
+        self._conn = connection
         self._in_trans = False
-        self._cursor = None
         self._locks = []
 
     def __enter__(self):
@@ -47,73 +164,17 @@ class transaction(object):
         else:
             yield from self.commit()
 
-    # ############# base db option #############
-
-    async def select(self, sql, params=None, cursor=None):
-        log("execute: %s - %r" % (sql, params))
-
-        cursor = await self._conn.cursor(cursor)
-        if params:
-            await  cursor.execute(sql, params)
-        await cursor.execute(sql)
-
-        await cursor.close()
-        return cursor.fetchall()
-
-    async def insert(self, sql, params=None):
-        log("execute: %s - %r" % (sql, params))
-
-        cursor = await self._conn.cursor()
-        try:
-            if params:
-                await  cursor.execute(sql, params)
-            await cursor.execute(sql)
-            return cursor.lastrowid
-        finally:
-            await cursor.close()
-            return cursor.lastrowid
-
-    async def execute(self, sql, params=None):
-        log("execute: %s - %r" % (sql, params))
-
-        cursor = await self._conn.cursor()
-        try:
-            if params:
-                await  cursor.execute(sql, params)
-            await cursor.execute(sql)
-        finally:
-            await cursor.close()
-
-    # ############## transaction #############
     async def begin(self):
-        await self.execute("BEGIN")
+        await db_op.execute(self._conn, "BEGIN")
         self._in_trans = True
 
     async def rollback(self):
-        await self.execute("ROLLBACK")
+        await db_op.execute(self._conn, "ROLLBACK")
         self._in_trans = False
 
     async def commit(self):
-        await self.execute("COMMIT")
+        await db_op.execute(self._conn, "COMMIT")
         self._in_trans = False
-
-    async def lock(self, key, timeout=0):
-
-        # TODO:[0][0]
-        locked = await self.select("SELECT GET_LOCK(%s, %s)", (key, timeout))[0][0] == 1
-
-        if locked:
-            self._locks.append(key)
-
-        return locked
-
-    async def release(self, key):
-        released = await self.select("SELECT RELEASE_LOCK(%s)", (key,))[0][0] == 1
-
-        if released and key in self._locks:
-            self._locks.remove(key)
-
-        return released
 
 
 class MyConnection(object):
@@ -144,7 +205,7 @@ class MyConnection(object):
         return self._pool
 
 
-async def getconn(db_name):
+async def get_conn(db_name):
     # TODO:每次都connect会有点奇怪
     return await pools[db_name].connect()
 

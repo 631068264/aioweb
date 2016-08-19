@@ -7,13 +7,13 @@
 """
 from sys import getsizeof
 
-from aiomysql import DictCursor
-from base.framework import ErrorResponse, OkResponse, RouteCollector, data_check, general
+from base.framework import ErrorResponse, OkResponse, RouteCollector, data_check, general, db_conn
 from base.models import android_push
 from base.xform import F_int, F_str
 from config import FCM_CONFIG
-from db.conn import get_connection, get_pool
-from db.smartconnect import transaction, getconn
+from db.conn import get_connection
+from db.smartconnect import transaction
+from db.smartsql import QS, T, F
 from util.fcm.fcm import FCMNotification
 
 route = RouteCollector('push', prefix='/android_push')
@@ -22,18 +22,19 @@ push_service = FCMNotification(max_concurrent=10)
 
 @route('/token', method='POST')
 @general()
+@db_conn("db_writer")
 @data_check({
     'uid': (F_int('用户id') > 0) & 'required' & 'strict',
     'token': F_str('用户token') & 'required' & 'strict',
 })
-async def token(request, safe_vars):
-    pool = await getconn("db_writer")
-    with await pool as conn:
+async def token(request, safe_vars, db):
+    with await db as conn:
         async with transaction(conn) as conn:
-            cur = await conn.cursor(DictCursor)
-            stmt = "select * from android_push"
-            await cur.execute(stmt)
-            re = await cur.fetchall()
+            re = await QS(conn).table(T.android_push__a).where(F.a__uid == 1).select()
+            # cur = await conn.cursor(DictCursor)
+            # stmt = "select * from android_push"
+            # await cur.execute(stmt)
+            # re = await cur.fetchall()
 
     print(re)
     # pool = await get_pool()

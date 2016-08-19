@@ -16,6 +16,7 @@ from aiohttp_jinja2 import render_template
 from attrdict import AttrDict
 from base import cons, util
 from base.xform import default_messages, DataChecker
+from db.smartconnect import get_conn
 from functools import wraps
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "ErrorResponse",
 
     "general",
+    "db_conn",
     "data_check",
 ]
 
@@ -194,9 +196,16 @@ async def error_middleware(app, handler):
 # Decorator
 ############################################################
 def general(desc=None):
+    """
+    this decorator must the first one that after route one
+    :param desc:
+    :return:
+    """
+
     def new_deco(old_handler):
         @wraps(old_handler)
         async def new_handler(request, *args, **kwargs):
+            print("%s - - %s %s" % (request.host, request.method, request.path_qs,))
             resp = await old_handler(request, *args, **kwargs)
             if isinstance(resp, TemplateResponse):
                 # add specific context
@@ -217,7 +226,19 @@ def general(desc=None):
     return new_deco
 
 
-def data_check(settings=None, var_name='safe_vars', error_handler=None, is_strict=True, error_var='form_vars'):
+def db_conn(db_name, var_name="db"):
+    def new_deco(old_handler):
+        @wraps(old_handler)
+        async def new_handler(request, *args, **kwargs):
+            kwargs[var_name] = await get_conn(db_name)
+            return await old_handler(request, *args, **kwargs)
+
+        return new_handler
+
+    return new_deco
+
+
+def data_check(settings=None, var_name="safe_vars", error_handler=None, is_strict=True, error_var='form_vars'):
     if error_handler is None:
         error_handler = ErrorResponse
 
