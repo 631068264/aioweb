@@ -7,6 +7,8 @@
 """
 import os
 
+import smartconnect
+
 project_home = os.path.realpath(__file__)
 project_home = os.path.dirname(project_home)
 import sys
@@ -22,7 +24,6 @@ import views
 from aiohttp import web
 from jinja2 import FileSystemLoader
 import jinja_filter
-from db import smartconnect
 from framework import error_middleware
 
 # log setting

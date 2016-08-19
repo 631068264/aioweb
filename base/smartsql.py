@@ -9,7 +9,8 @@
 import copy
 
 from attrdict import AttrDict
-from db.smartconnect import db_op
+
+from smartconnect import db_op
 
 __all__ = ["QS", "T", "F", "E"]
 

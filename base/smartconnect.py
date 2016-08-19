@@ -111,7 +111,6 @@ class lock_str(object):
         yield from self.release()
 
     async def lock(self):
-        # TODO:[0][0]
         locked = await db_op.select(self._conn, "SELECT GET_LOCK(%s, %s)", (self._key, self._timeout))
 
         if locked[0][0] == 1:
