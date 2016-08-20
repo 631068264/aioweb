@@ -11,10 +11,10 @@ import json
 from aiohttp import ClientSession, errors
 
 from base.cons import FCM_STATUS_CODE
+from base.framework import db_conn
 from base.smartconnect import transaction
 from base.smartsql import QS, T, F
 from config import FCM_CONFIG
-from framework import db_conn
 
 
 class FCMAPI(object):

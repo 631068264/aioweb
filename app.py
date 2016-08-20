@@ -5,9 +5,8 @@
 @time = 16/7/29 12:08
 @annotation = '' 
 """
-import os
 
-import smartconnect
+import os
 
 project_home = os.path.realpath(__file__)
 project_home = os.path.dirname(project_home)
@@ -15,7 +14,8 @@ import sys
 
 sys.path.append(os.path.dirname(project_home))
 sys.path.append(project_home)
-
+from base import smartconnect, jinja_filter
+from base.framework import error_middleware
 import config
 from base import logger
 from util.fcm import fcm
@@ -23,8 +23,6 @@ import aiohttp_jinja2
 import views
 from aiohttp import web
 from jinja2 import FileSystemLoader
-import jinja_filter
-from framework import error_middleware
 
 # log setting
 logger.init_log([(n, os.path.join("logs", p), l)

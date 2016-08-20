@@ -5,13 +5,7 @@
 @time = 16/7/29 11:08
 @annotation = '' 
 """
-# DB_CONFIG = {
-#     'host': '127.0.0.1',
-#     'port': 3306,
-#     'db': 'android_push',
-#     'user': 'root',
-#     'password': '',
-# }
+
 encoding = 'utf8'
 pool_size = (3, 10)
 db_config = {
