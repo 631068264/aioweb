@@ -33,49 +33,52 @@ class db_op(object):
     """
 
     @staticmethod
-    async def select(conn, sql, params=None, dict_cursor=False):
-        log("execute: %s - %r" % (sql, params))
+    async def select(db, sql, params=None, dict_cursor=False):
+        async with db.acquire() as conn:
+            log("execute: %s - %r" % (sql, params))
 
-        if dict_cursor:
-            cursor = await conn.cursor(DictCursor)
-        else:
+            if dict_cursor:
+                cursor = await conn.cursor(DictCursor)
+            else:
+                cursor = await conn.cursor()
+            try:
+                if params:
+                    await cursor.execute(sql, params)
+                else:
+                    await cursor.execute(sql)
+
+                return await cursor.fetchall()
+            finally:
+                await cursor.close()
+
+    @staticmethod
+    async def insert(db, sql, params=None):
+        async with db.acquire() as conn:
+            log("execute: %s - %r" % (sql, params))
+
             cursor = await conn.cursor()
-        try:
-            if params:
-                await cursor.execute(sql, params)
-            else:
-                await cursor.execute(sql)
-
-            return await cursor.fetchall()
-        finally:
-            await cursor.close()
-
-    @staticmethod
-    async def insert(conn, sql, params=None):
-        log("execute: %s - %r" % (sql, params))
-
-        cursor = await conn.cursor()
-        try:
-            if params:
-                await  cursor.execute(sql, params)
-            else:
-                await cursor.execute(sql)
-            return cursor.lastrowid
-        finally:
-            await cursor.close()
+            try:
+                if params:
+                    await  cursor.execute(sql, params)
+                else:
+                    await cursor.execute(sql)
+                return cursor.lastrowid
+            finally:
+                await cursor.close()
 
     @staticmethod
-    async def execute(conn, sql, params=None):
-        log("execute: %s - %r" % (sql, params))
+    async def execute(db, sql, params=None):
+        async with db.acquire() as conn:
+            log("execute: %s - %r" % (sql, params))
 
-        cursor = await conn.cursor()
-        try:
-            if params:
-                await  cursor.execute(sql, params)
-            else:
-                await cursor.execute(sql)
-        finally:
-            await cursor.close()
+            cursor = await conn.cursor()
+            try:
+                if params:
+                    await  cursor.execute(sql, params)
+                else:
+                    await cursor.execute(sql)
+            finally:
+                await cursor.close()
 
 
 class lock_str(object):

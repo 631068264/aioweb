@@ -8,8 +8,8 @@ doc https://firebase.google.com/docs/cloud-messaging/http-server-ref
 """
 import asyncio
 import json
-from aiohttp import ClientSession, errors
 
+from aiohttp import ClientSession, errors
 from base.cons import FCM_STATUS_CODE
 from base.framework import db_conn
 from base.smartconnect import transaction
@@ -198,8 +198,7 @@ class FCMAPI(object):
     async def handler_error_regids(self, regids, db):
         regids = [reg_id['reg_id'] for reg_id in regids]
 
-        with await db as conn:
-            async with transaction(conn) as conn:
-                fail_uids = await QS(conn).table(T.android_push).where(F.reg_id == regids).group_by(F.uid).select(F.uid)
-                fail_uisds = [uid.uid for uid in fail_uids]
-                await QS(conn).table(T.android_push).where(F.reg_id == regids).delete()
+        async with transaction(db) as conn:
+            fail_uids = await QS(conn).table(T.android_push).where(F.reg_id == regids).group_by(F.uid).select(F.uid)
+            fail_uisds = [uid.uid for uid in fail_uids]
+            await QS(conn).table(T.android_push).where(F.reg_id == regids).delete()

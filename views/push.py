@@ -13,7 +13,6 @@ from base.smartsql import QS, F
 from base.smartsql import T
 from base.xform import F_int, F_str
 from config import FCM_CONFIG
-
 from util.fcm.fcm import FCMNotification
 
 route = RouteCollector('push', prefix='/android_push')
@@ -28,12 +27,11 @@ push_service = FCMNotification(max_concurrent=10)
     'token': F_str('用户token') & 'required' & 'strict',
 })
 async def token(request, safe_vars, db):
-    with await db as conn:
-        async with transaction(conn) as conn:
-            await QS(conn).table(T.android_push).insert({
-                "uid": safe_vars.uid,
-                "reg_id": safe_vars.token,
-            })
+    async with transaction(db) as conn:
+        await QS(conn).table(T.android_push).insert({
+            "uid": safe_vars.uid,
+            "reg_id": safe_vars.token,
+        })
 
     return OkResponse()
 
@@ -54,9 +52,9 @@ async def token(request, safe_vars, db):
 
 })
 async def notify(request, safe_vars, db):
-    with await db as conn:
-        push_item = await QS(conn).table(T.android_push).where(F.uid == safe_vars.uids).select()
-        registration_ids = [p.reg_id for p in push_item]
+
+    push_item = await QS(db).table(T.android_push).where(F.uid == safe_vars.uids).select()
+    registration_ids = [p.reg_id for p in push_item]
 
     safe_vars.registration_ids = registration_ids
     safe_vars.pop('uids')

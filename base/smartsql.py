@@ -72,6 +72,17 @@ class TableSet(object):
     def __add__(self, obj):
         return self._add_join("LEFT JOIN", obj)
 
+    # public func
+    def on(self, c):
+        self._join_list[-1]._on = c
+        return self
+
+    # private func
+    def _add_join(self, join_type, obj):
+        obj._join = join_type
+        self._join_list.append(obj)
+        return self
+
     @property
     def sql(self):
         sql = [" ".join([k.sql for k in self._join_list])]
@@ -90,17 +101,6 @@ class TableSet(object):
         for sql_obj in self._join_list:
             params.extend(sql_obj.params)
         return params
-
-    # public func
-    def on(self, c):
-        self._join_list[-1]._on = c
-        return self
-
-    # private func
-    def _add_join(self, join_type, obj):
-        obj._join = join_type
-        self._join_list.append(obj)
-        return self
 
 
 class MetaField(type):
@@ -454,19 +454,19 @@ def _gen_fv_dict(fv_dict, params):
     return ", ".join(sql)
 
 
-class QuerySetDeepcopyHelper(object):
-    """
-        used ot avoid deep copy the db
-    """
-
-    def __init__(self, db):
-        self._db = db
-
-    def __deepcopy__(self, memo):
-        return self
-
-    def __getattr__(self, attr):
-        return getattr(self._db, attr)
+# class QuerySetDeepcopyHelper(object):
+#     """
+#         used ot avoid deep copy the db
+#     """
+#
+#     def __init__(self, db):
+#         self._db = db
+#
+#     def __deepcopy__(self, memo):
+#         return self
+#
+#     def __getattr__(self, attr):
+#         return getattr(self._db, attr)
 
 
 def prop(f):
@@ -484,7 +484,8 @@ class QuerySet(object):
         if isinstance(db_or_t, Table) or isinstance(db_or_t, TableSet):
             self.tables = db_or_t
         else:
-            self._db = QuerySetDeepcopyHelper(db_or_t)
+            # self._db = QuerySetDeepcopyHelper(db_or_t)
+            self._db = db_or_t
 
         # simple var
         self._group_by = None
@@ -841,7 +842,7 @@ if __name__ == "__main__":
         print("**********  Step by Step Query   **********")
         print("*******************************************")
         t = T.grade
-        print(await QS(t).limit(0, 100).select(F.name))
+        print(await QS(t).where(F.like % "like").limit(0, 100).select(F.name))
         print("===========================================")
 
         t = (t * T.base).on(F.grade__item_type == F.base__type)
