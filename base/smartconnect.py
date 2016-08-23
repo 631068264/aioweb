@@ -12,7 +12,7 @@ from aiomysql import DictCursor
 
 __all__ = [
     "db_op", "transaction", "lock_str",
-    "MyConnection", "init_pool", "get_conn"
+    "MysqlConnection", "init_pool", "get_conn"
 ]
 query_log = None
 query_echo = False  # help you watch the log in console when you debug
@@ -68,7 +68,7 @@ class db_op(object):
 
     @staticmethod
     async def execute(db, sql, params=None):
-        async with db.acquire() as conn:
+        with await db as conn:
             log("execute: %s - %r" % (sql, params))
 
             cursor = await conn.cursor()
@@ -179,7 +179,7 @@ class transaction(object):
         self._in_trans = False
 
 
-class MyConnection(object):
+class MysqlConnection(object):
     def __init__(self, minsize=3, maxsize=10, host="localhost", port=3306, db=None,
                  user=None, passwd="", charset="utf8", autocommit=True):
         self._config = {
@@ -207,11 +207,97 @@ class MyConnection(object):
         return self._pool
 
 
-async def get_conn(db_name):
-    # TODO:每次都connect会有点奇怪
-    return await pools[db_name].connect()
+class EmptyPoolError(Exception):
+    pass
+
+
+def safe_call(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except:
+        pass
+
+
+class Local(object):
+    def __init__(self):
+        self._storage = {}
+
+    @property
+    def ident(self):
+        return get_ident()
+
+    @property
+    def local_storage(self):
+        return self._storage.setdefault(self.ident, {})
+
+    def __getitem__(self, key):
+        return self.local_storage[key]
+
+    def __setitem__(self, key, value):
+        self.local_storage[key] = value
+
+    def get(self, key, default=None):
+        return self.local_storage.get(key, default)
+
+    def pop(self, key):
+        return self.local_storage.pop(key)
+
+
+def lazy(db_name, local, name):
+    def wrap_func(*args, **kwargs):
+        conn = local.get("conn")
+        if conn is None:
+            conn = get_conn(db_name)
+            if conn is None:
+                raise EmptyPoolError()
+        try:
+            return getattr(conn, name)(*args, **kwargs)
+        finally:
+            if conn.reusable:
+                safe_call(local.pop, "conn")
+                del conn
+            else:
+                local["conn"] = conn
+
+    return wrap_func
+
+
+class ConnectionProxy(object):
+    def __init__(self, db_name):
+        self._db_name = db_name
+        self._local = Local()
+        self._none = None
+
+    def __getattr__(self, name):
+        return lazy(self._db_name, self._local, name)
+
+
+def get_conn(db_name):
+    return pools[db_name]
 
 
 # init before concurrence
-def init_pool(db_name, *args, **kwargs):
-    pools[db_name] = MyConnection(*args, **kwargs)
+def init_pool(db_config, minsize=3, maxsize=10, loop=None):
+    if loop is None:
+        raise 'Please "loop=app.loop" '
+    tasks = []
+    for name, setting in db_config.items():
+        task = asyncio.ensure_future(MysqlConnection(minsize, maxsize, **setting).connect())
+
+        def handler_conn(fut):
+            try:
+                res = fut.result()
+                pools[name] = res
+            except Exception as e:
+                print(e)
+                for f in tasks:
+                    f.cancel()
+
+        task.add_done_callback(handler_conn)
+        tasks.append(task)
+    loop.run_until_complete(asyncio.wait(tasks))
+
+
+if __name__ == "__main__":
+    # conn = ConnectionProxy("db_writer")
+    print("sfd")
