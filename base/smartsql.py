@@ -9,7 +9,7 @@ import asyncio
 
 import copy
 from attrdict import AttrDict
-from base.smartconnect import db_op
+from base.smartconnect import MyDBConnection
 
 __all__ = ["QS", "T", "F", "E"]
 
@@ -485,7 +485,7 @@ class QuerySet(object):
             self.tables = db_or_t
         else:
             # self._db = QuerySetDeepcopyHelper(db_or_t)
-            self._db = db_or_t
+            self._db = MyDBConnection(db_or_t)
 
         # simple var
         self._group_by = None
@@ -603,7 +603,7 @@ class QuerySet(object):
         sql = " ".join(sql)
         if self._db is None:
             return sql, params
-        result = await db_op.select(self._db, sql, params)
+        result = await self._db.select(sql, params)
         return result[0][0]
 
     @opt_checker(["distinct", "for_update", "dict_cursor"])
@@ -625,7 +625,7 @@ class QuerySet(object):
             return sql, params
 
         attr_rows = []
-        rows = await db_op.select(self._db, sql, params, dict_cursor=opt.get("dict_cursor", True))
+        rows = await self._db.select(sql, params, dict_cursor=opt.get("dict_cursor", True))
         for row in rows:
             attr_rows.append(AttrDict(row))
         return attr_rows
@@ -648,7 +648,7 @@ class QuerySet(object):
         sql = " ".join(sql)
         if self._db is None:
             return sql, params
-        result = await db_op.select(self._db, sql, params, dict_cursor=True)
+        result = await self._db.select(sql, params, dict_cursor=True)
         return None if len(result) < 1 else AttrDict(result[0])
 
     async def select_for_union(self, *f_list, **opt):
@@ -662,7 +662,7 @@ class QuerySet(object):
         if self._db is None:
             return sql, params
 
-        return await db_op.insert(self._db, sql, params)
+        return await self._db.insert(sql, params)
 
     @opt_checker(["ignore", "on_duplicate_key_update", "__dry_run__"])
     async def insert_many(self, f_list, v_list_set, **opt):
@@ -685,7 +685,7 @@ class QuerySet(object):
         if self._db is None or opt.get("__dry_run__", False):
             return sql, params
 
-        return await db_op.execute(self._db, sql, params)
+        return await self._db.execute(sql, params)
 
     @opt_checker(["ignore"])
     async def update(self, fv_dict, **opt):
@@ -706,7 +706,7 @@ class QuerySet(object):
         if self._db is None:
             return sql, params
 
-        return await db_op.execute(self._db, sql, params)
+        return await self._db.execute(sql, params)
 
     async def delete(self):
         sql = ["DELETE"]
@@ -718,7 +718,7 @@ class QuerySet(object):
         if self._db is None:
             return sql, params
 
-        return await db_op.execute(self._db, sql, params)
+        return await self._db.execute(sql, params)
 
     # private function
     def _join_sql_part(self, sql, params, join_list):
@@ -914,7 +914,11 @@ if __name__ == "__main__":
         print("===========================================")
         print(await QS(T.user).where(F.id == 100).update({"name": "nobody", "status": 1}, ignore=True))
         print("===========================================")
-        print(await QS(T.user).where(F.status == 1).delete())
+        print(await QS(getattr(T, "dm2028")).where(F.status == 1).delete())
+
+        print(await QS(getattr(T, "dm2028")).where(
+            (F.day == range(1, 2 + 1))
+        ).group_by(F.day).order_by(F.day).select("COUNT(distinct uid)", F.day))
 
 
     loop = asyncio.get_event_loop()

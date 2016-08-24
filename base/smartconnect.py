@@ -11,7 +11,7 @@ import aiomysql
 from aiomysql import DictCursor
 
 __all__ = [
-    "db_op", "transaction", "lock_str",
+    "MyDBConnection", "transaction", "lock_str",
     "MyConnection", "init_pool", "get_conn"
 ]
 query_log = None
@@ -27,14 +27,21 @@ def log(msg):
     query_log(msg)
 
 
-class db_op(object):
+class MyDBConnection(object):
     """
     base db option
     """
 
-    @staticmethod
-    async def select(db, sql, params=None, dict_cursor=False):
-        async with db.acquire() as conn:
+    def __init__(self, db):
+        self._db = db
+        self._locks = []
+        self._in_trans = False
+
+    def __deepcopy__(self):
+        return self
+
+    async def select(self, sql, params=None, dict_cursor=False):
+        async with self._db.acquire() as conn:
             log("execute: %s - %r" % (sql, params))
 
             if dict_cursor:
@@ -51,9 +58,8 @@ class db_op(object):
             finally:
                 await cursor.close()
 
-    @staticmethod
-    async def insert(db, sql, params=None):
-        async with db.acquire() as conn:
+    async def insert(self, sql, params=None):
+        async with self._db.acquire() as conn:
             log("execute: %s - %r" % (sql, params))
 
             cursor = await conn.cursor()
@@ -66,9 +72,8 @@ class db_op(object):
             finally:
                 await cursor.close()
 
-    @staticmethod
-    async def execute(db, sql, params=None):
-        async with db.acquire() as conn:
+    async def execute(self, sql, params=None):
+        async with self._db.acquire() as conn:
             log("execute: %s - %r" % (sql, params))
 
             cursor = await conn.cursor()
@@ -81,7 +86,7 @@ class db_op(object):
                 await cursor.close()
 
 
-class lock_str(object):
+class lock_str(MyDBConnection):
     """
     Usage:
     It will release the lock finally
@@ -92,10 +97,9 @@ class lock_str(object):
     """
 
     def __init__(self, connection, key, timeout=0):
-        self._conn = connection
+        MyDBConnection.__init__(self, db=connection)
         self._key = key
         self._timeout = timeout
-        self._locks = []
 
     def __enter__(self):
         raise RuntimeError(
@@ -114,7 +118,7 @@ class lock_str(object):
         yield from self.release()
 
     async def lock(self):
-        locked = await db_op.select(self._conn, "SELECT GET_LOCK(%s, %s)", (self._key, self._timeout))
+        locked = await self.select("SELECT GET_LOCK(%s, %s)", (self._key, self._timeout))
 
         if locked[0][0] == 1:
             self._locks.append(self._key)
@@ -123,7 +127,7 @@ class lock_str(object):
 
     async def release(self):
 
-        released = await db_op.select(self._conn, "SELECT RELEASE_LOCK(%s)", (self._key,))
+        released = await self.select("SELECT RELEASE_LOCK(%s)", (self._key,))
 
         if released[0][0] == 1 and self._key in self._locks:
             self._locks.remove(self._key)
@@ -131,7 +135,7 @@ class lock_str(object):
         return released
 
 
-class transaction(object):
+class transaction(MyDBConnection):
     """
     Usage:
         if "sth" makes any exception occurs, it will roolback
@@ -143,9 +147,8 @@ class transaction(object):
     """
 
     def __init__(self, connection):
-        self._conn = connection
-        self._in_trans = False
-        self._locks = []
+        MyDBConnection.__init__(self, db=connection)
+        # self._conn = connection
 
     def __enter__(self):
         raise RuntimeError(
@@ -157,7 +160,7 @@ class transaction(object):
     @asyncio.coroutine
     def __aenter__(self):
         yield from self.begin()
-        return self._conn
+        return self._db
 
     @asyncio.coroutine
     def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -167,15 +170,15 @@ class transaction(object):
             yield from self.commit()
 
     async def begin(self):
-        await db_op.execute(self._conn, "BEGIN")
+        await self.execute("BEGIN")
         self._in_trans = True
 
     async def rollback(self):
-        await db_op.execute(self._conn, "ROLLBACK")
+        await self.execute("ROLLBACK")
         self._in_trans = False
 
     async def commit(self):
-        await db_op.execute(self._conn, "COMMIT")
+        await self.execute("COMMIT")
         self._in_trans = False
 
 
@@ -205,6 +208,79 @@ class MyConnection(object):
         log("connect")
         self._pool = await aiomysql.create_pool(**self._config)
         return self._pool
+
+
+# # ########## local storage ############
+#
+# try:
+#     from thread import get_ident
+# except ImportError:
+#     from _thread import get_ident
+#
+#
+# class Local(object):
+#     def __init__(self):
+#         self._storage = {}
+#
+#     @property
+#     def ident(self):
+#         return get_ident()
+#
+#     @property
+#     def local_storage(self):
+#         return self._storage.setdefault(self.ident, {})
+#
+#     def __getitem__(self, key):
+#         return self.local_storage[key]
+#
+#     def __setitem__(self, key, value):
+#         self.local_storage[key] = value
+#
+#     def get(self, key, default=None):
+#         return self.local_storage.get(key, default)
+#
+#     def pop(self, key):
+#         return self.local_storage.pop(key)
+#
+#
+# class EmptyPoolError(Exception):
+#     pass
+#
+#
+# def safe_call(func, *args, **kwargs):
+#     try:
+#         return func(*args, **kwargs)
+#     except:
+#         pass
+#
+#
+# def lazy(db_name, local, name):
+#     def wrap_func(*args, **kwargs):
+#         conn = local.get("conn")
+#         if conn is None:
+#             conn = get_conn(db_name)
+#             if conn is None:
+#                 raise EmptyPoolError()
+#
+#         try:
+#             return getattr(conn, name)(*args, **kwargs)
+#         finally:
+#             if conn.reusable:
+#                 safe_call(local.pop, "conn")
+#                 del conn
+#             else:
+#                 local["conn"] = conn
+#
+#     return wrap_func
+#
+#
+# class ConnectionProxy(object):
+#     def __init__(self, db_name):
+#         self._db_name = db_name
+#         self._local = Local()
+#
+#     def __getattr__(self, name):
+#         return lazy(self._db_name, self._local, name)
 
 
 async def get_conn(db_name):

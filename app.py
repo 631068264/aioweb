@@ -14,10 +14,9 @@ import sys
 
 sys.path.append(os.path.dirname(project_home))
 sys.path.append(project_home)
-from base import smartconnect, jinja_filter
+from base import smartconnect, jinja_filter, logger
 from base.framework import error_middleware
 import config
-from base import logger
 from util.fcm import fcm
 import aiohttp_jinja2
 import views
