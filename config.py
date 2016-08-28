@@ -10,9 +10,9 @@ encoding = 'utf8'
 pool_size = (3, 10)
 db_config = {
     "db_reader": {"host": "127.0.0.1", "port": 3306, "db": "android_push",
-                  "user": "root", "passwd": "", "charset": encoding},
+                  "user": "root", "passwd": "wuyuxi08", "charset": encoding},
     "db_writer": {"host": "127.0.0.1", "port": 3306, "db": "android_push",
-                  "user": "root", "passwd": "", "charset": encoding},
+                  "user": "root", "passwd": "wuyuxi08", "charset": encoding},
 }
 FCM_CONFIG = {
     'URL': 'https://fcm.googleapis.com/fcm/send',
