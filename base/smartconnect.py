@@ -41,13 +41,13 @@ class MyDBConnection(object):
         return self
 
     async def select(self, sql, params=None, dict_cursor=False):
-        async with self._db.acquire() as conn:
+        # async with self._db.acquire() as conn:
             log("execute: %s - %r" % (sql, params))
 
             if dict_cursor:
-                cursor = await conn.cursor(DictCursor)
+                cursor = await self._db.cursor(DictCursor)
             else:
-                cursor = await conn.cursor()
+                cursor = await self._db.cursor()
             try:
                 if params:
                     await cursor.execute(sql, params)
@@ -59,10 +59,10 @@ class MyDBConnection(object):
                 await cursor.close()
 
     async def insert(self, sql, params=None):
-        async with self._db.acquire() as conn:
+        # async with self._db.acquire() as conn:
             log("execute: %s - %r" % (sql, params))
 
-            cursor = await conn.cursor()
+            cursor = await self._db.cursor()
             try:
                 if params:
                     await  cursor.execute(sql, params)
@@ -73,10 +73,10 @@ class MyDBConnection(object):
                 await cursor.close()
 
     async def execute(self, sql, params=None):
-        async with self._db.acquire() as conn:
+        # async with self._db.acquire() as conn:
             log("execute: %s - %r" % (sql, params))
 
-            cursor = await conn.cursor()
+            cursor = await self._db.cursor()
             try:
                 if params:
                     await  cursor.execute(sql, params)
@@ -186,8 +186,8 @@ class MyConnection(object):
     def __init__(self, minsize=3, maxsize=10, host="localhost", port=3306, db=None,
                  user=None, passwd="", charset="utf8", autocommit=True):
         self._config = {
-            "minsize": minsize,
-            "maxsize": maxsize,
+            # "minsize": minsize,
+            # "maxsize": maxsize,
             "host": host,
             "port": port,
             "db": db,
@@ -206,7 +206,7 @@ class MyConnection(object):
         :return:
         """
         log("connect")
-        self._pool = await aiomysql.create_pool(**self._config)
+        self._pool = await aiomysql.connect(**self._config)
         return self._pool
 
 
