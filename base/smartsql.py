@@ -9,7 +9,6 @@ import asyncio
 
 import copy
 from attrdict import AttrDict
-from base.smartconnect import MyDBConnection
 
 __all__ = ["QS", "T", "F", "E"]
 
@@ -485,7 +484,7 @@ class QuerySet(object):
             self.tables = db_or_t
         else:
             # self._db = QuerySetDeepcopyHelper(db_or_t)
-            self._db = MyDBConnection(db_or_t)
+            self._db = db_or_t
 
         # simple var
         self._group_by = None

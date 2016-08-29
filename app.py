@@ -7,6 +7,7 @@
 """
 
 import os
+from base.smartconnect import MysqlConnection
 
 project_home = os.path.realpath(__file__)
 project_home = os.path.dirname(project_home)
@@ -35,7 +36,7 @@ if getattr(config, 'query_echo', None) is not None:
     smartconnect.query_echo = config.query_echo
 
 for name, setting in config.db_config.items():
-    smartconnect.init_pool(name, *config.pool_size, **setting)
+    smartconnect.init_pool(name, setting, MysqlConnection, *config.pool_size)
 
 app = web.Application(middlewares=[error_middleware, ])
 # import handler

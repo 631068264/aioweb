@@ -14,7 +14,7 @@ from aiohttp.web_reqrep import Response, json_response
 from aiohttp_jinja2 import render_template
 from attrdict import AttrDict
 from base import cons, util, logger
-from base.smartconnect import get_conn
+from base.smartconnect import ConnectionProxy
 from base.xform import default_messages, DataChecker
 from functools import wraps
 
@@ -225,11 +225,24 @@ def general(desc=None):
     return new_deco
 
 
-def db_conn(db_name, var_name="db"):
+def db_conn(db_name_or_list_or_dict, var_name="db", dict_name="db_dict"):
     def new_deco(old_handler):
         @wraps(old_handler)
         async def new_handler(request, *args, **kwargs):
-            kwargs[var_name] = await get_conn(db_name)
+            params = {}
+            if isinstance(db_name_or_list_or_dict, dict):
+                buf = {}
+                for k, v in db_name_or_list_or_dict.items():
+                    buf[k] = ConnectionProxy(v)
+                params[dict_name] = buf
+            elif isinstance(db_name_or_list_or_dict, list):
+                for k in db_name_or_list_or_dict:
+                    params[k] = ConnectionProxy(k)
+            else:
+                k = db_name_or_list_or_dict
+                params[var_name] = ConnectionProxy(k)
+            kwargs.update(params)
+            # kwargs[var_name] = await get_conn(db_name)
             return await old_handler(request, *args, **kwargs)
 
         return new_handler
